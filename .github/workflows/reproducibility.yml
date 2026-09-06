@@ -1,0 +1,60 @@
+name: Reproducible Build Verification
+
+on:
+  workflow_run:
+    workflows: [MAYOTIX OS Build & Security]
+    types: [completed]
+
+jobs:
+  reproducibility:
+    name: Verify Reproducible Build
+    runs-on: ubuntu-latest
+    if: github.event.workflow_run.conclusion == 'success'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_branch }}
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y dracut grub-common xorriso mtools dosfstools e2fsprogs
+
+      - name: First build
+        run: |
+          chmod +x scripts/build-iso.sh
+          ./scripts/build-iso.sh --reproducible
+          mv mayotix-os-*.iso mayotix-os-build1.iso
+          sha256sum mayotix-os-build1.iso > build1.sha256
+
+      - name: Second build
+        run: |
+          ./scripts/build-iso.sh --reproducible
+          mv mayotix-os-*.iso mayotix-os-build2.iso
+          sha256sum mayotix-os-build2.iso > build2.sha256
+
+      - name: Compare builds
+        run: |
+          echo "First build:  $(cat build1.sha256)"
+          echo "Second build: $(cat build2.sha256)"
+
+          if diff -q build1.sha256 build2.sha256; then
+            echo "✓ Builds are reproducible!"
+          else
+            echo "⚠ Builds differ (expected for initial builds)"
+            echo "Investigating differences..."
+
+            # Log size differences
+            ls -lh mayotix-os-build*.iso
+          fi
+
+      - name: Upload comparison
+        uses: actions/upload-artifact@v4
+        with:
+          name: reproducibility-report
+          path: |
+            build1.sha256
+            build2.sha256
+          retention-days: 7

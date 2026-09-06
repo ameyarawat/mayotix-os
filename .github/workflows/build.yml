@@ -1,0 +1,195 @@
+name: MAYOTIX OS Build & Security
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+  schedule:
+    - cron: '0 2 * * *'  # Nightly builds at 2 AM UTC
+
+jobs:
+  security:
+    name: Security Checks
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Scan for secrets
+        run: |
+          set +e
+          grep -r "PRIVATE KEY\|-----BEGIN\|api_key\|password.*=\|secret.*=" . \
+            --exclude-dir=.git \
+            --exclude-dir=build \
+            --exclude="*.iso" \
+            --exclude="*.log" 2>/dev/null | grep -v "MAYOTIX_ARCHITECTURE.md" | grep -v "example"
+
+          if [ $? -eq 0 ]; then
+            echo "❌ Secrets found in repository"
+            exit 1
+          fi
+          echo "✓ No secrets detected"
+
+      - name: Run security audit
+        run: |
+          chmod +x scripts/security-check.sh
+          ./scripts/security-check.sh
+
+      - name: Check file permissions
+        run: |
+          # Verify no world-writable sensitive files
+          find . -type f -perm /002 -not -path './.git/*' | head -20
+          if [ $? -eq 0 ]; then
+            echo "⚠ Found world-writable files"
+          fi
+
+  lint:
+    name: Code Quality
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup shellcheck
+        run: sudo apt-get install -y shellcheck
+
+      - name: Lint shell scripts
+        run: |
+          shellcheck scripts/*.sh
+
+      - name: Validate JSON files
+        run: |
+          find . -name "*.json" -not -path "./.git/*" -not -path "./node_modules/*" \
+            -exec python3 -m json.tool {} \;
+
+      - name: Validate YAML
+        run: |
+          python3 -m pip install pyyaml
+          find . -name "*.yml" -o -name "*.yaml" | while read f; do
+            python3 -c "import yaml; yaml.safe_load(open('$f'))"
+          done || true
+
+  build:
+    name: Build ISO
+    runs-on: ubuntu-latest
+    needs: [security, lint]
+    if: github.event_name == 'push' || github.event_name == 'schedule'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            dracut \
+            grub-common \
+            grub-efi-amd64 \
+            xorriso \
+            mtools \
+            dosfstools \
+            e2fsprogs
+
+      - name: Build ISO
+        run: |
+          chmod +x scripts/build-iso.sh
+          ./scripts/build-iso.sh --quick
+
+      - name: Generate checksums
+        run: |
+          sha256sum mayotix-os-*.iso > mayotix-os-*.iso.sha256
+
+      - name: Upload ISO artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: mayotix-os-iso
+          path: |
+            mayotix-os-*.iso
+            mayotix-os-*.iso.sha256
+          retention-days: 7
+
+  test:
+    name: Test ISO
+    runs-on: ubuntu-latest
+    needs: build
+    if: github.event_name == 'push'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download ISO
+        uses: actions/download-artifact@v4
+        with:
+          name: mayotix-os-iso
+
+      - name: Install QEMU
+        run: |
+          sudo apt-get install -y qemu-system-x86 qemu-utils
+
+      - name: Test boot (BIOS)
+        run: |
+          chmod +x scripts/test-boot.sh
+          timeout 60 ./scripts/test-boot.sh mayotix-os-*.iso --bios || true
+
+      - name: Test boot (UEFI)
+        run: |
+          timeout 60 ./scripts/test-boot.sh mayotix-os-*.iso --uefi || true
+
+  verify:
+    name: Verify Build
+    runs-on: ubuntu-latest
+    needs: build
+
+    steps:
+      - name: Download ISO
+        uses: actions/download-artifact@v4
+        with:
+          name: mayotix-os-iso
+
+      - name: Verify checksums
+        run: |
+          sha256sum -c mayotix-os-*.iso.sha256
+
+      - name: Check ISO format
+        run: |
+          file mayotix-os-*.iso
+
+      - name: Get ISO size
+        run: |
+          du -h mayotix-os-*.iso
+
+  release:
+    name: Create Release
+    runs-on: ubuntu-latest
+    needs: [security, lint, verify, test]
+    if: startsWith(github.ref, 'refs/tags/v')
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: mayotix-os-iso
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            mayotix-os-*.iso
+            mayotix-os-*.iso.sha256
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

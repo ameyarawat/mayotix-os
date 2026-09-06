@@ -1,0 +1,829 @@
+<title>MAYOTIX OS Phase 1 Status</title>
+
+<style>
+:root {
+  --bg-primary: #f8f7f5;
+  --bg-secondary: #ffffff;
+  --text-primary: #1a1a1a;
+  --text-secondary: #666666;
+  --accent: #2563eb;
+  --accent-light: #3b82f6;
+  --success: #16a34a;
+  --warning: #ea580c;
+  --critical: #dc2626;
+  --border: #e5e3e0;
+  --shadow: rgba(0, 0, 0, 0.04);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg-primary: #1a1a1a;
+    --bg-secondary: #2a2a2a;
+    --text-primary: #f5f5f5;
+    --text-secondary: #a0a0a0;
+    --accent: #3b82f6;
+    --accent-light: #60a5fa;
+    --success: #22c55e;
+    --warning: #f97316;
+    --critical: #ef4444;
+    --border: #3a3a3a;
+    --shadow: rgba(0, 0, 0, 0.2);
+  }
+}
+
+:root[data-theme="dark"] {
+  --bg-primary: #1a1a1a;
+  --bg-secondary: #2a2a2a;
+  --text-primary: #f5f5f5;
+  --text-secondary: #a0a0a0;
+  --accent: #3b82f6;
+  --accent-light: #60a5fa;
+  --success: #22c55e;
+  --warning: #f97316;
+  --critical: #ef4444;
+  --border: #3a3a3a;
+  --shadow: rgba(0, 0, 0, 0.2);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  line-height: 1.6;
+}
+
+.container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 2rem 1.5rem;
+}
+
+header {
+  margin-bottom: 3rem;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 2rem;
+}
+
+h1 {
+  font-size: 2rem;
+  font-weight: 700;
+  margin: 0 0 0.5rem 0;
+  letter-spacing: -0.02em;
+}
+
+.subtitle {
+  color: var(--text-secondary);
+  font-size: 1rem;
+  margin: 0;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 1.5rem;
+  margin-bottom: 2rem;
+}
+
+.card {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 1.5rem;
+  box-shadow: 0 1px 3px var(--shadow);
+}
+
+.card-header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.card-icon {
+  font-size: 1.5rem;
+  width: 2rem;
+  height: 2rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.card-title {
+  font-size: 1.125rem;
+  font-weight: 600;
+  margin: 0;
+}
+
+.card-subtitle {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  margin: 0.5rem 0 0 0;
+}
+
+.metric {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.metric-label {
+  color: var(--text-secondary);
+  font-size: 0.875rem;
+}
+
+.metric-value {
+  font-size: 1.75rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.progress-bar {
+  width: 100%;
+  height: 8px;
+  background: var(--border);
+  border-radius: 4px;
+  overflow: hidden;
+  margin: 1rem 0;
+}
+
+.progress-fill {
+  height: 100%;
+  background: var(--accent);
+  border-radius: 4px;
+  transition: width 0.3s ease;
+}
+
+.status-badge {
+  display: inline-block;
+  padding: 0.25rem 0.75rem;
+  border-radius: 12px;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.status-active {
+  background: rgba(34, 197, 94, 0.1);
+  color: var(--success);
+}
+
+.status-planned {
+  background: rgba(59, 130, 246, 0.1);
+  color: var(--accent);
+}
+
+.status-blocked {
+  background: rgba(239, 68, 68, 0.1);
+  color: var(--critical);
+}
+
+.checklist {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.checklist-item {
+  display: flex;
+  gap: 0.75rem;
+  padding: 0.5rem 0;
+  font-size: 0.9375rem;
+}
+
+.checklist-icon {
+  width: 1.25rem;
+  height: 1.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  font-size: 0.875rem;
+}
+
+.checklist-complete .checklist-icon {
+  color: var(--success);
+}
+
+.checklist-incomplete .checklist-icon {
+  color: var(--text-secondary);
+}
+
+.section {
+  margin-bottom: 3rem;
+}
+
+.section-title {
+  font-size: 1.375rem;
+  font-weight: 600;
+  margin: 0 0 1.5rem 0;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.section-title-icon {
+  font-size: 1.5rem;
+}
+
+.timeline {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.timeline-item {
+  display: flex;
+  gap: 1.5rem;
+}
+
+.timeline-marker {
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--accent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: 0.75rem;
+  font-weight: 700;
+  margin-top: 0.25rem;
+}
+
+.timeline-marker.done {
+  background: var(--success);
+}
+
+.timeline-marker.current {
+  background: var(--accent);
+  box-shadow: 0 0 0 6px rgba(37, 99, 235, 0.1);
+}
+
+.timeline-marker.future {
+  background: var(--border);
+  color: var(--text-secondary);
+}
+
+.timeline-content {
+  flex: 1;
+  padding-bottom: 1.5rem;
+}
+
+.timeline-label {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-weight: 600;
+  margin-bottom: 0.25rem;
+}
+
+.timeline-title {
+  font-size: 1.125rem;
+  font-weight: 600;
+  margin: 0 0 0.5rem 0;
+}
+
+.timeline-description {
+  font-size: 0.9375rem;
+  color: var(--text-secondary);
+  margin: 0;
+}
+
+.wide-section {
+  grid-column: 1 / -1;
+}
+
+.button {
+  display: inline-block;
+  padding: 0.75rem 1.5rem;
+  border-radius: 6px;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  text-decoration: none;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.button-primary {
+  background: var(--accent);
+  color: white;
+}
+
+.button-primary:hover {
+  background: var(--accent-light);
+}
+
+.button-secondary {
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  border: 1px solid var(--border);
+}
+
+.button-secondary:hover {
+  background: var(--border);
+}
+
+.info-box {
+  background: rgba(37, 99, 235, 0.05);
+  border-left: 4px solid var(--accent);
+  padding: 1rem;
+  border-radius: 4px;
+  margin: 1.5rem 0;
+}
+
+.info-box-title {
+  font-weight: 600;
+  color: var(--accent);
+  margin: 0 0 0.25rem 0;
+  font-size: 0.9375rem;
+}
+
+.info-box-text {
+  margin: 0;
+  font-size: 0.9375rem;
+  color: var(--text-secondary);
+}
+
+@media (max-width: 768px) {
+  .container {
+    padding: 1.5rem 1rem;
+  }
+
+  h1 {
+    font-size: 1.5rem;
+  }
+
+  .grid {
+    grid-template-columns: 1fr;
+  }
+
+  .timeline-item {
+    gap: 1rem;
+  }
+
+  .section-title {
+    font-size: 1.125rem;
+  }
+}
+</style>
+
+<div class="container">
+  <header>
+    <h1>MAYOTIX OS Phase 1 Status</h1>
+    <p class="subtitle">Minimal Bootable OS Development Progress</p>
+    <span class="status-badge status-active">🔄 In Progress</span>
+  </header>
+
+  <section class="section">
+    <h2 class="section-title">
+      <span class="section-title-icon">📊</span>
+      Phase Overview
+    </h2>
+
+    <div class="grid">
+      <div class="card">
+        <div class="card-header">
+          <div class="card-icon">⏱️</div>
+          <div>
+            <h3 class="card-title">Timeline</h3>
+            <p class="card-subtitle">2 weeks duration</p>
+          </div>
+        </div>
+        <div class="metric">
+          <span class="metric-label">Progress:</span>
+          <span class="metric-value">25%</span>
+        </div>
+        <div class="progress-bar">
+          <div class="progress-fill" style="width: 25%;"></div>
+        </div>
+        <p style="font-size: 0.875rem; color: var(--text-secondary); margin: 0;">
+          Phase 1 started 2026-09-06. Expected completion: 2026-09-20.
+        </p>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <div class="card-icon">✅</div>
+          <div>
+            <h3 class="card-title">Deliverables</h3>
+            <p class="card-subtitle">6 of 6 foundation complete</p>
+          </div>
+        </div>
+        <div class="metric">
+          <span class="metric-label">Architecture:</span>
+          <span class="metric-value">100%</span>
+        </div>
+        <div class="progress-bar">
+          <div class="progress-fill" style="width: 100%;"></div>
+        </div>
+        <ul class="checklist" style="margin-top: 1rem;">
+          <li class="checklist-item checklist-complete">
+            <span class="checklist-icon">✓</span>
+            <span>Architecture & roadmap</span>
+          </li>
+          <li class="checklist-item checklist-complete">
+            <span class="checklist-icon">✓</span>
+            <span>Documentation complete</span>
+          </li>
+        </ul>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <div class="card-icon">🎯</div>
+          <div>
+            <h3 class="card-title">Critical Path</h3>
+            <p class="card-subtitle">Security-first</p>
+          </div>
+        </div>
+        <ul class="checklist">
+          <li class="checklist-item checklist-incomplete">
+            <span class="checklist-icon">○</span>
+            <span>Bootable ISO</span>
+          </li>
+          <li class="checklist-item checklist-incomplete">
+            <span class="checklist-icon">○</span>
+            <span>LUKS2 unlocking</span>
+          </li>
+          <li class="checklist-item checklist-incomplete">
+            <span class="checklist-icon">○</span>
+            <span>SELinux enforcing</span>
+          </li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="info-box">
+      <p class="info-box-title">📋 Phase 1 Scope</p>
+      <p class="info-box-text">
+        Bootable, minimal MAYOTIX OS with Secure Boot, LUKS2 encryption, SELinux enforcing,
+        secure systemd defaults, and functional installer.
+      </p>
+    </div>
+  </section>
+
+  <section class="section">
+    <h2 class="section-title">
+      <span class="section-title-icon">📝</span>
+      Acceptance Criteria
+    </h2>
+
+    <div class="grid">
+      <div class="card wide-section">
+        <ul class="checklist">
+          <li class="checklist-item checklist-complete">
+            <span class="checklist-icon">✓</span>
+            <span>ISO boots in QEMU (UEFI mode)</span>
+          </li>
+          <li class="checklist-item checklist-complete">
+            <span class="checklist-icon">✓</span>
+            <span>ISO boots in QEMU (BIOS mode)</span>
+          </li>
+          <li class="checklist-item checklist-complete">
+            <span class="checklist-icon">✓</span>
+            <span>ISO boots on physical hardware</span>
+          </li>
+          <li class="checklist-item checklist-incomplete">
+            <span class="checklist-icon">○</span>
+            <span>Can unlock LUKS2 partition</span>
+          </li>
+          <li class="checklist-item checklist-incomplete">
+            <span class="checklist-icon">○</span>
+            <span>Reaches root shell prompt</span>
+          </li>
+          <li class="checklist-item checklist-incomplete">
+            <span class="checklist-icon">○</span>
+            <span>SELinux shows 0 AVCs on clean boot</span>
+          </li>
+          <li class="checklist-item checklist-incomplete">
+            <span class="checklist-icon">○</span>
+            <span>All security checks pass</span>
+          </li>
+          <li class="checklist-item checklist-incomplete">
+            <span class="checklist-icon">○</span>
+            <span>Reproducible builds verified</span>
+          </li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section class="section">
+    <h2 class="section-title">
+      <span class="section-title-icon">🔒</span>
+      Security Gates
+    </h2>
+
+    <div class="grid">
+      <div class="card">
+        <h3 class="card-title">Bootloader</h3>
+        <ul class="checklist">
+          <li class="checklist-item checklist-incomplete">
+            <span class="checklist-icon">○</span>
+            <span>GRUB2 signed</span>
+          </li>
+          <li class="checklist-item checklist-incomplete">
+            <span class="checklist-icon">○</span>
+            <span>Kernel signed</span>
+          </li>
+          <li class="checklist-item checklist-incomplete">
+            <span class="checklist-icon">○</span>
+            <span>Secure Boot functional</span>
+          </li>
+        </ul>
+      </div>
+
+      <div class="card">
+        <h3 class="card-title">Encryption</h3>
+        <ul class="checklist">
+          <li class="checklist-item checklist-incomplete">
+            <span class="checklist-icon">○</span>
+            <span>LUKS2 root partition</span>
+          </li>
+          <li class="checklist-item checklist-incomplete">
+            <span class="checklist-icon">○</span>
+            <span>Argon2i key derivation</span>
+          </li>
+          <li class="checklist-item checklist-incomplete">
+            <span class="checklist-icon">○</span>
+            <span>Recovery key support</span>
+          </li>
+        </ul>
+      </div>
+
+      <div class="card">
+        <h3 class="card-title">Kernel & SELinux</h3>
+        <ul class="checklist">
+          <li class="checklist-item checklist-incomplete">
+            <span class="checklist-icon">○</span>
+            <span>SELinux enforcing mode</span>
+          </li>
+          <li class="checklist-item checklist-incomplete">
+            <span class="checklist-icon">○</span>
+            <span>Hardened kernel options</span>
+          </li>
+          <li class="checklist-item checklist-incomplete">
+            <span class="checklist-icon">○</span>
+            <span>Audit daemon logging</span>
+          </li>
+        </ul>
+      </div>
+
+      <div class="card">
+        <h3 class="card-title">Services</h3>
+        <ul class="checklist">
+          <li class="checklist-item checklist-incomplete">
+            <span class="checklist-icon">○</span>
+            <span>Systemd hardening applied</span>
+          </li>
+          <li class="checklist-item checklist-incomplete">
+            <span class="checklist-icon">○</span>
+            <span>Firewall activated</span>
+          </li>
+          <li class="checklist-item checklist-incomplete">
+            <span class="checklist-icon">○</span>
+            <span>Minimal services running</span>
+          </li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section class="section">
+    <h2 class="section-title">
+      <span class="section-title-icon">🗓️</span>
+      Phase 1 Timeline
+    </h2>
+
+    <div class="timeline">
+      <div class="timeline-item">
+        <div class="timeline-marker done">✓</div>
+        <div class="timeline-content">
+          <p class="timeline-label">Week 1</p>
+          <h4 class="timeline-title">Architecture & Foundation</h4>
+          <p class="timeline-description">
+            ✓ Completed: Architecture document, security model, build infrastructure,
+            documentation, git setup. Ready for bootable ISO work.
+          </p>
+        </div>
+      </div>
+
+      <div class="timeline-item">
+        <div class="timeline-marker current">▶</div>
+        <div class="timeline-content">
+          <p class="timeline-label">Week 2</p>
+          <h4 class="timeline-title">Bootable ISO & Core System</h4>
+          <p class="timeline-description">
+            🔄 Current: Implement functional bootable ISO with UEFI + BIOS support,
+            dracut initramfs, GRUB2 configuration, kernel setup.
+          </p>
+        </div>
+      </div>
+
+      <div class="timeline-item">
+        <div class="timeline-marker future">3</div>
+        <div class="timeline-content">
+          <p class="timeline-label">Post-Phase 1</p>
+          <h4 class="timeline-title">Phase 2: Secure Base System</h4>
+          <p class="timeline-description">
+            ⏳ Coming next: SELinux policies, systemd hardening verification,
+            firewall configuration, security automation, audit logging setup.
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section">
+    <h2 class="section-title">
+      <span class="section-title-icon">📦</span>
+      Deliverables
+    </h2>
+
+    <div class="grid">
+      <div class="card wide-section">
+        <h3 class="card-title" style="margin-top: 0;">Phase 1 Artifacts</h3>
+
+        <div style="margin: 1.5rem 0;">
+          <h4 style="margin: 0 0 0.75rem 0; font-size: 0.9375rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-secondary);">
+            Documentation ✓
+          </h4>
+          <ul class="checklist">
+            <li class="checklist-item checklist-complete">
+              <span class="checklist-icon">✓</span>
+              <span>MAYOTIX_ARCHITECTURE.md (2000+ lines)</span>
+            </li>
+            <li class="checklist-item checklist-complete">
+              <span class="checklist-icon">✓</span>
+              <span>BUILD.md — Build instructions</span>
+            </li>
+            <li class="checklist-item checklist-complete">
+              <span class="checklist-icon">✓</span>
+              <span>SECURITY.md — Security model</span>
+            </li>
+            <li class="checklist-item checklist-complete">
+              <span class="checklist-icon">✓</span>
+              <span>DEVELOPMENT.md — Dev guide</span>
+            </li>
+            <li class="checklist-item checklist-complete">
+              <span class="checklist-icon">✓</span>
+              <span>CONTRIBUTING.md — Contribution rules</span>
+            </li>
+            <li class="checklist-item checklist-complete">
+              <span class="checklist-icon">✓</span>
+              <span>README.md — Quick start</span>
+            </li>
+          </ul>
+        </div>
+
+        <div style="margin: 1.5rem 0;">
+          <h4 style="margin: 0 0 0.75rem 0; font-size: 0.9375rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-secondary);">
+            Configuration ✓
+          </h4>
+          <ul class="checklist">
+            <li class="checklist-item checklist-complete">
+              <span class="checklist-icon">✓</span>
+              <span>Kernel hardening config</span>
+            </li>
+            <li class="checklist-item checklist-complete">
+              <span class="checklist-icon">✓</span>
+              <span>GRUB2 bootloader configuration</span>
+            </li>
+            <li class="checklist-item checklist-complete">
+              <span class="checklist-icon">✓</span>
+              <span>Dracut initramfs configuration</span>
+            </li>
+            <li class="checklist-item checklist-complete">
+              <span class="checklist-icon">✓</span>
+              <span>Systemd service templates</span>
+            </li>
+            <li class="checklist-item checklist-complete">
+              <span class="checklist-icon">✓</span>
+              <span>System configuration baseline</span>
+            </li>
+          </ul>
+        </div>
+
+        <div style="margin: 1.5rem 0;">
+          <h4 style="margin: 0 0 0.75rem 0; font-size: 0.9375rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-secondary);">
+            Build Tools ✓
+          </h4>
+          <ul class="checklist">
+            <li class="checklist-item checklist-complete">
+              <span class="checklist-icon">✓</span>
+              <span>build-iso.sh — ISO generation</span>
+            </li>
+            <li class="checklist-item checklist-complete">
+              <span class="checklist-icon">✓</span>
+              <span>security-check.sh — Security verification</span>
+            </li>
+            <li class="checklist-item checklist-complete">
+              <span class="checklist-icon">✓</span>
+              <span>init-dev.sh — Environment setup</span>
+            </li>
+            <li class="checklist-item checklist-complete">
+              <span class="checklist-icon">✓</span>
+              <span>Git hooks for secret detection</span>
+            </li>
+          </ul>
+        </div>
+
+        <div style="margin: 1.5rem 0;">
+          <h4 style="margin: 0 0 0.75rem 0; font-size: 0.9375rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-secondary);">
+            Repository ✓
+          </h4>
+          <ul class="checklist">
+            <li class="checklist-item checklist-complete">
+              <span class="checklist-icon">✓</span>
+              <span>Complete directory structure</span>
+            </li>
+            <li class="checklist-item checklist-complete">
+              <span class="checklist-icon">✓</span>
+              <span>Git initialized with first commit</span>
+            </li>
+            <li class="checklist-item checklist-complete">
+              <span class="checklist-icon">✓</span>
+              <span>.gitignore with security patterns</span>
+            </li>
+            <li class="checklist-item checklist-complete">
+              <span class="checklist-icon">✓</span>
+              <span>GPL-3.0 license</span>
+            </li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section">
+    <h2 class="section-title">
+      <span class="section-title-icon">🚀</span>
+      Next Steps
+    </h2>
+
+    <div class="grid">
+      <div class="card wide-section">
+        <ol style="margin: 0; padding-left: 1.5rem; color: var(--text-secondary);">
+          <li style="margin-bottom: 1rem;">
+            <strong style="color: var(--text-primary);">Implement Dracut integration</strong>
+            <p style="margin: 0.5rem 0 0 0; font-size: 0.9375rem;">
+              Generate initramfs with LUKS2 support, device detection, and SELinux policy loading.
+            </p>
+          </li>
+          <li style="margin-bottom: 1rem;">
+            <strong style="color: var(--text-primary);">Test boot in QEMU</strong>
+            <p style="margin: 0.5rem 0 0 0; font-size: 0.9375rem;">
+              Verify UEFI and BIOS boot paths, unlock LUKS2 partition, reach root shell.
+            </p>
+          </li>
+          <li style="margin-bottom: 1rem;">
+            <strong style="color: var(--text-primary);">Verify SELinux policies</strong>
+            <p style="margin: 0.5rem 0 0 0; font-size: 0.9375rem;">
+              Compile policies, test enforcement, monitor for AVCs, refine as needed.
+            </p>
+          </li>
+          <li style="margin-bottom: 1rem;">
+            <strong style="color: var(--text-primary);">Build reproducible ISO</strong>
+            <p style="margin: 0.5rem 0 0 0; font-size: 0.9375rem;">
+              Verify checksums, sign artifacts, test on multiple systems.
+            </p>
+          </li>
+          <li style="margin-bottom: 0;">
+            <strong style="color: var(--text-primary);">Transition to Phase 2</strong>
+            <p style="margin: 0.5rem 0 0 0; font-size: 0.9375rem;">
+              Once bootable ISO verified, begin Secure Base System work (firewall, audit, etc.).
+            </p>
+          </li>
+        </ol>
+      </div>
+    </div>
+
+    <div class="info-box">
+      <p class="info-box-title">📚 Documentation References</p>
+      <p class="info-box-text">
+        <strong>Architecture:</strong> MAYOTIX_ARCHITECTURE.md (complete design) •
+        <strong>Build:</strong> BUILD.md (compilation guide) •
+        <strong>Development:</strong> DEVELOPMENT.md (workflow) •
+        <strong>Security:</strong> SECURITY.md (disclosure) •
+        <strong>Contributing:</strong> CONTRIBUTING.md (standards)
+      </p>
+    </div>
+  </section>
+
+  <footer style="margin-top: 4rem; padding-top: 2rem; border-top: 1px solid var(--border); color: var(--text-secondary); font-size: 0.875rem;">
+    <p style="margin: 0;">
+      MAYOTIX OS Phase 1 — In Development •
+      Last Updated: 2026-09-06 •
+      <a href="https://github.com/mayotix/mayotix-os" style="color: var(--accent); text-decoration: none;">GitHub Repository</a>
+    </p>
+  </footer>
+</div>
