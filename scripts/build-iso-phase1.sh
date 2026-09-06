@@ -50,12 +50,33 @@ done
 check_dependencies() {
     log_info "Checking dependencies..."
 
+    # Detect distro and set tool names accordingly
+    # Fedora uses grub2-* naming, Debian/Ubuntu uses grub-*
+    if command -v grub2-mkimage &>/dev/null; then
+        GRUB_MKIMAGE="grub2-mkimage"
+    elif command -v grub-mkimage &>/dev/null; then
+        GRUB_MKIMAGE="grub-mkimage"
+    else
+        log_error "Required tool not found: grub-mkimage or grub2-mkimage"
+    fi
+    log_success "GRUB tool found: $GRUB_MKIMAGE"
+
+    # xorriso or genisoimage/mkisofs for ISO creation
+    if command -v xorriso &>/dev/null; then
+        ISO_TOOL="xorriso"
+    elif command -v genisoimage &>/dev/null; then
+        ISO_TOOL="genisoimage"
+    elif command -v mkisofs &>/dev/null; then
+        ISO_TOOL="mkisofs"
+    else
+        log_error "Required tool not found: xorriso, genisoimage, or mkisofs"
+    fi
+    log_success "ISO tool found: $ISO_TOOL"
+
     local required=(
         "dracut"
-        "grub-mkimage"
-        "xorriso"
-        "mtools"
         "mkfs.ext4"
+        "mkfs.vfat"
     )
 
     for cmd in "${required[@]}"; do
@@ -216,21 +237,42 @@ create_iso_filesystem() {
 
     local iso_path="${BUILD_DIR}/mayotix-os-1.0-alpha-x86_64.iso"
 
-    # Create xorriso command
-    xorriso -as mkisofs \
-        -o "$iso_path" \
-        -isohybrid-mbr /usr/lib/syslinux/isohdpfx.bin \
-        -c isolinux/boot.cat \
-        -boot-load-size 4 \
-        -boot-info-table \
-        -eltorito-catalog isolinux/boot.cat \
-        -eltorito-boot isolinux/isolinux.bin \
-        -no-emul-boot \
-        -eltorito-alt-boot \
-        -e boot/efi/efiboot.img \
-        -no-emul-boot \
-        -isohybrid-gpt-basdat \
-        "$ISO_DIR"
+    # Find syslinux MBR binary (path differs between distros)
+    local isohdpfx=""
+    for path in /usr/lib/syslinux/isohdpfx.bin /usr/share/syslinux/isohdpfx.bin /usr/lib/syslinux/bios/isohdpfx.bin; do
+        if [[ -f "$path" ]]; then
+            isohdpfx="$path"
+            break
+        fi
+    done
+
+    if [[ "$ISO_TOOL" == "xorriso" ]]; then
+        local xorriso_args=(
+            -as mkisofs
+            -o "$iso_path"
+            -boot-load-size 4
+            -boot-info-table
+            -no-emul-boot
+            -eltorito-alt-boot
+            -e boot/efi/efiboot.img
+            -no-emul-boot
+        )
+        # Only add isohybrid if syslinux MBR was found
+        if [[ -n "$isohdpfx" ]]; then
+            xorriso_args+=(-isohybrid-mbr "$isohdpfx" -isohybrid-gpt-basdat)
+        fi
+        xorriso "${xorriso_args[@]}" "$ISO_DIR"
+    else
+        # genisoimage / mkisofs fallback
+        "$ISO_TOOL" \
+            -o "$iso_path" \
+            -R -J -joliet-long \
+            -V "MAYOTIX_OS" \
+            -eltorito-alt-boot \
+            -e boot/efi/efiboot.img \
+            -no-emul-boot \
+            "$ISO_DIR"
+    fi
 
     log_success "ISO created: $iso_path"
     echo "$iso_path"
