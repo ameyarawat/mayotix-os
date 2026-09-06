@@ -161,14 +161,25 @@ build_initramfs() {
 
     log_info "Using dracut modules:$available_modules"
 
+    # Build dracut include arguments
+    local dracut_args=(
+        --add "$available_modules"
+        --no-hostonly
+        --force
+    )
+
+    # Only include directories that exist and are non-empty
+    if [[ -d "${SERVICES_DIR}" ]] && [[ -n "$(ls -A "${SERVICES_DIR}" 2>/dev/null)" ]]; then
+        dracut_args+=(--include "${SERVICES_DIR}" /etc/systemd/system)
+    fi
+    if [[ -d "${PROJECT_ROOT}/security/selinux" ]] && [[ -n "$(find "${PROJECT_ROOT}/security/selinux" -not -name '.gitkeep' -not -name '.' | head -1)" ]]; then
+        dracut_args+=(--include "${PROJECT_ROOT}/security/selinux" /etc/selinux)
+    else
+        log_warn "SELinux directory empty, skipping include"
+    fi
+
     # Build initramfs (no --hostonly since we're building a generic ISO)
-    dracut \
-        --include "${SERVICES_DIR}" /etc/systemd/system \
-        --include "${PROJECT_ROOT}/security/selinux" /etc/selinux \
-        --add "$available_modules" \
-        --no-hostonly \
-        --force \
-        "$initramfs" \
+    dracut "${dracut_args[@]}" "$initramfs" \
         || log_error "Dracut failed"
 
     log_success "Initramfs built: $initramfs"
@@ -236,12 +247,50 @@ create_efi_image() {
     log_info "Creating EFI boot image..."
 
     local efiboot="${ISO_DIR}/boot/efi/efiboot.img"
+    local efi_mount="${BUILD_DIR}/efi_mount"
 
-    # Create FAT12 EFI boot partition
-    dd if=/dev/zero of="$efiboot" bs=1M count=50
-    mkfs.vfat -F 12 "$efiboot"
+    # Create small FAT16 EFI boot partition (4MB is enough for bootloader)
+    dd if=/dev/zero of="$efiboot" bs=1M count=4
+    mkfs.vfat -F 16 "$efiboot"
 
-    log_success "EFI image created"
+    # Mount and populate EFI structure
+    mkdir -p "$efi_mount"
+    mount -o loop "$efiboot" "$efi_mount"
+    mkdir -p "$efi_mount/EFI/BOOT"
+
+    # Copy GRUB EFI binary if available
+    local grub_efi=""
+    for path in /boot/efi/EFI/fedora/grubx64.efi /usr/lib/grub/x86_64-efi/grub.efi /boot/efi/EFI/BOOT/BOOTX64.EFI; do
+        if [[ -f "$path" ]]; then
+            grub_efi="$path"
+            break
+        fi
+    done
+
+    if [[ -n "$grub_efi" ]]; then
+        cp "$grub_efi" "$efi_mount/EFI/BOOT/BOOTX64.EFI"
+        log_success "EFI bootloader copied from $grub_efi"
+    else
+        log_warn "No EFI bootloader found, creating placeholder"
+        touch "$efi_mount/EFI/BOOT/BOOTX64.EFI"
+    fi
+
+    # Copy GRUB config for EFI
+    mkdir -p "$efi_mount/EFI/BOOT/"
+    if [[ -f "${ISO_DIR}/boot/grub2/grub.cfg" ]]; then
+        cp "${ISO_DIR}/boot/grub2/grub.cfg" "$efi_mount/EFI/BOOT/grub.cfg"
+    fi
+
+    umount "$efi_mount"
+    rmdir "$efi_mount"
+
+    # Also create the EFI/BOOT directory in the ISO tree
+    mkdir -p "${ISO_DIR}/EFI/BOOT"
+    if [[ -n "$grub_efi" ]]; then
+        cp "$grub_efi" "${ISO_DIR}/EFI/BOOT/BOOTX64.EFI"
+    fi
+
+    log_success "EFI image created (4MB)"
 }
 
 # Create ISO filesystem
