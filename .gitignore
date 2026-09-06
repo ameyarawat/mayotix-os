@@ -1,0 +1,61 @@
+# Build artifacts
+*.iso
+*.img
+*.qcow2
+build/
+dist/
+*.o
+*.a
+
+# Dependencies
+.venv/
+node_modules/
+*.egg-info/
+__pycache__/
+.cargo/
+target/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Secrets (CRITICAL - never commit)
+.env
+.env.local
+*.key
+*.pem
+*.p12
+*.pfx
+credentials.json
+secrets.json
+signing_key
+**/private_key
+config/production/*
+.aws/
+.ssh/
+
+# Logs
+*.log
+logs/
+build.log
+
+# OS
+.DS_Store
+Thumbs.db
+
+# CI/CD
+.github/workflows/secrets.yml
+
+# Testing
+coverage/
+.pytest_cache/
+dist-test/
+
+# Release artifacts (store in S3, not git)
+releases/
+*.sha256
+*.sig
+*.asc

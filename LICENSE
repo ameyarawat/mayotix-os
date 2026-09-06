@@ -1,0 +1,36 @@
+LICENSE_TYPE = "GPL-3.0"
+SPDX_ID = "GPL-3.0-only"
+
+MAYOTIX OS is licensed under the GNU General Public License v3.0
+
+Full license text: https://www.gnu.org/licenses/gpl-3.0.txt
+
+Key terms:
+
+1. You may use, modify, and distribute MAYOTIX OS freely
+2. You must include the license and copyright notice
+3. You must disclose source code when distributing
+4. You must use the same license (GPLv3) for modifications
+5. No warranty is provided (use at your own risk)
+6. No liability for damages
+
+Third-party components maintain their original licenses (Fedora, GNOME, etc.).
+
+For commercial use, see GNU's guidance: https://www.gnu.org/licenses/gpl-faq.en.html
+
+---
+
+Copyright (c) 2026 MAYOTIX OS Contributors
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program.  If not, see <https://www.gnu.org/licenses/>.

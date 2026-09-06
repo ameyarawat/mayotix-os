@@ -1,0 +1,44 @@
+[Unit]
+Description=MAYOTIX Security Daemon
+Documentation=man:mayotix(1) https://mayotix.os/docs
+After=network-online.target auditd.service
+Before=graphical.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/usr/libexec/mayotix-security-daemon
+ExecReload=/bin/kill -HUP $MAINPID
+Restart=on-failure
+RestartSec=10s
+
+### Security hardening
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+NoNewPrivileges=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+LockPersonality=yes
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+RestrictNamespaces=yes
+CapabilityBoundingSet=CAP_DAC_READ_SEARCH CAP_AUDIT_READ CAP_AUDIT_WRITE
+AmbientCapabilities=
+
+### Resource limits
+LimitNOFILE=65535
+
+### Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=mayotix-security
+
+### Runtime directory
+RuntimeDirectory=mayotix
+RuntimeDirectoryMode=0755
+StateDirectory=mayotix
+StateDirectoryMode=0700
+
+[Install]
+WantedBy=multi-user.target
