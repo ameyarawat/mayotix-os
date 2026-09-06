@@ -146,14 +146,27 @@ build_initramfs() {
         cp "${BOOT_DIR}/dracut/dracut.conf" /etc/dracut.conf.d/mayotix.conf
     fi
 
-    # Build initramfs with LUKS2, SELinux, and device support
+    # Detect which dracut modules are available on this system
+    local available_modules=""
+    for mod in crypt dm selinux systemd base; do
+        if dracut --list-modules 2>/dev/null | grep -qw "$mod"; then
+            available_modules="$available_modules $mod"
+        fi
+    done
+
+    # Fallback: if --list-modules didn't work, use safe defaults
+    if [[ -z "$available_modules" ]]; then
+        available_modules="base systemd"
+    fi
+
+    log_info "Using dracut modules:$available_modules"
+
+    # Build initramfs (no --hostonly since we're building a generic ISO)
     dracut \
         --include "${SERVICES_DIR}" /etc/systemd/system \
         --include "${PROJECT_ROOT}/security/selinux" /etc/selinux \
-        --add "crypt cryptsetup dm dmraid biosdevname ifcfg selinux systemd" \
-        --hostonly-cmdline \
-        --no-hostonly-default-device \
-        --hostonly \
+        --add "$available_modules" \
+        --no-hostonly \
         --force \
         "$initramfs" \
         || log_error "Dracut failed"
