@@ -337,7 +337,6 @@ create_iso_filesystem() {
     fi
 
     log_success "ISO created: $iso_path"
-    echo "$iso_path"
 }
 
 # Generate checksums
@@ -402,8 +401,8 @@ main() {
     create_efi_image
 
     # Create ISO
-    local iso_path
-    iso_path=$(create_iso_filesystem)
+    local iso_path="${BUILD_DIR}/mayotix-os-1.0-alpha-x86_64.iso"
+    create_iso_filesystem
 
     # Generate verification files
     generate_checksums "$iso_path"
