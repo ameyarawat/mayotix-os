@@ -251,7 +251,7 @@ create_efi_image() {
 
     # Create small FAT16 EFI boot partition (4MB is enough for bootloader)
     dd if=/dev/zero of="$efiboot" bs=1M count=4
-    mkfs.vfat -F 16 "$efiboot"
+    mkfs.vfat -F 12 "$efiboot"
 
     # Mount and populate EFI structure
     mkdir -p "$efi_mount"
