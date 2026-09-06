@@ -1,0 +1,86 @@
+# Interface definitions for MAYOTIX SELinux policy
+
+## <summary>
+## Execute a mayotix domain transition and allow execution
+## </summary>
+## <param name="domain">
+## <summary>
+## Domain allowed access.
+## </summary>
+## </param>
+interface(`mayotix_domtrans',`
+	genre(usertype)
+	typetrans_pattern($1, mayotix_exec_t, process, mayotix_t)
+	allow $1 mayotix_exec_t:file { execute execute_no_trans read open };
+	allow mayotix_t $1:process { siginh noatsecure rlimitinh setrlimit };
+')
+
+## <summary>
+## Allow domain to read mayotix configuration files
+## </summary>
+## <param name="domain">
+## <summary>
+## Domain allowed access.
+## </summary>
+## </param>
+interface(`mayotix_read_config',`
+	genre(usertype)
+	allow $1 mayotix_etc_t:dir search;
+	allow $1 mayotix_etc_t:file { read open };
+')
+
+## <summary>
+## Allow domain to read mayotix log files
+## </summary>
+## <param name="domain">
+## <summary>
+## Domain allowed access.
+## </summary>
+## </param>
+interface(`mayotix_read_log',`
+	genre(usertype)
+	allow $1 mayotix_log_t:dir search;
+	allow $1 mayotix_log_t:file { read open };
+')
+
+## <summary>
+## Allow domain to write mayotix log files
+## </summary>
+## <param name="domain">
+## <summary>
+## Domain allowed access.
+## </summary>
+## </param>
+interface(`mayotix_write_log',`
+	genre(usertype)
+	allow $1 mayotix_log_t:dir { search add_name };
+	allow $1 mayotix_log_t:file { create write open append };
+')
+
+## <summary>
+## Allow domain to manage mayotix temporary files
+## </summary>
+## <param name="domain">
+## <summary>
+## Domain allowed access.
+## </summary>
+## </param>
+interface(`mayotix_manage_tmp',`
+	genre(usertype)
+	allow $1 mayotix_tmp_t:dir { search add_name remove_name };
+	allow $1 mayotix_tmp_t:file { create read write open unlink link rename };
+')
+
+## <summary>
+## Allow domain to manage mayotix variable lib files
+## </summary>
+## <param name="domain">
+## <summary>
+## Domain allowed access.
+## </summary>
+## </param>
+interface(`mayotix_manage_var_lib',`
+	genre(usertype)
+	allow $1 mayotix_var_lib_t:dir { search add_name remove_name create write };
+	allow $1 mayotix_var_lib_t:file { create read write open unlink link rename rename };
+')

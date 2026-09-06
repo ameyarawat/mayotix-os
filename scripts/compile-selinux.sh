@@ -3,11 +3,13 @@
 #
 # Compiles SELinux policies from .te (type enforcement) source files
 # Generates .mod (module) and .pp (policy package) files
+# Also handles .fc (file context) and .if (interface) files
 #
 # Usage:
 #   ./scripts/compile-selinux.sh                    # Compile all policies
-#   ./scripts/compile-selinux.sh mayotix.te         # Compile specific policy
+#   ./scripts/compile-selinux.sh mayotix            # Compile specific policy (by base name)
 #   ./scripts/compile-selinux.sh --install          # Compile and load
+#   ./scripts/compile-selinux.sh mayotix --install  # Compile specific and install
 
 set -euo pipefail
 
@@ -34,8 +36,15 @@ SPECIFIC_POLICY=""
 while [[ $# -gt 0 ]]; do
     case $1 in
         --install) INSTALL=1 ;;
-        *.te) SPECIFIC_POLICY="$1" ;;
-        *) log_error "Unknown option: $1" ;;
+        *.te) SPECIFIC_POLICY="$1" ;; # Allow full path or just name with .te
+        *)
+            # If it doesn't contain ., treat as base name and add .te later
+            if [[ ! "$1" =~ \. ]]; then
+                SPECIFIC_POLICY="${1}.te"
+            else
+                log_error "Unknown option: $1"
+            fi
+            ;;
     esac
     shift
 done
@@ -48,6 +57,7 @@ check_prerequisites() {
         "checkmodule"
         "semodule_package"
         "semanage"
+        "semodule"
     )
 
     for tool in "${required_tools[@]}"; do
@@ -68,24 +78,34 @@ setup_build_dir() {
 # Compile individual policy
 compile_policy() {
     local te_file=$1
-    local module_name
-    module_name=$(basename "$te_file" .te)
+    local base_name
+    base_name=$(basename "$te_file" .te)
 
-    log_info "Compiling: $module_name"
+    log_info "Compiling: $base_name"
 
     # Compile .te to .mod
-    if checkmodule -M -m "$te_file" -o "${BUILD_DIR}/${module_name}.mod" &>/dev/null; then
-        log_success "$module_name compiled to .mod"
+    if checkmodule -M -m "$te_file" -o "${BUILD_DIR}/${base_name}.mod" &>/dev/null; then
+        log_success "$base_name compiled to .mod"
     else
-        log_error "Failed to compile $module_name"
+        log_error "Failed to compile $base_name"
     fi
 
     # Package .mod to .pp
-    if semodule_package -o "${BUILD_DIR}/${module_name}.pp" \
-        -m "${BUILD_DIR}/${module_name}.mod}" &>/dev/null; then
-        log_success "$module_name packaged to .pp"
+    if semodule_package -o "${BUILD_DIR}/${base_name}.pp" \
+        -m "${BUILD_DIR}/${base_name}.mod" &>/dev/null; then
+        log_success "$base_name packaged to .pp"
     else
-        log_error "Failed to package $module_name"
+        log_error "Failed to package $base_name"
+    fi
+
+    # Copy associated .fc and .if files to build directory for reference
+    if [[ -f "${SELINUX_DIR}/${base_name}.fc" ]]; then
+        cp "${SELINUX_DIR}/${base_name}.fc" "${BUILD_DIR}/"
+        log_success "Copied ${base_name}.fc to build directory"
+    fi
+    if [[ -f "${SELINUX_DIR}/${base_name}.if" ]]; then
+        cp "${SELINUX_DIR}/${base_name}.if" "${BUILD_DIR}/"
+        log_success "Copied ${base_name}.if to build directory"
     fi
 }
 
@@ -116,13 +136,13 @@ install_policies() {
 
     for pp_file in "${BUILD_DIR}"/*.pp; do
         if [[ -f "$pp_file" ]]; then
-            module_name=$(basename "$pp_file" .pp)
-            log_info "Installing: $module_name"
+            base_name=$(basename "$pp_file" .pp)
+            log_info "Installing: $base_name"
 
             if semodule -i "$pp_file"; then
-                log_success "$module_name installed"
+                log_success "$base_name installed"
             else
-                log_error "Failed to install $module_name"
+                log_error "Failed to install $base_name"
             fi
         fi
     done
@@ -147,8 +167,10 @@ main() {
     setup_build_dir
 
     if [[ -n "$SPECIFIC_POLICY" ]]; then
-        if [[ -f "$SELINUX_DIR/$SPECIFIC_POLICY" ]]; then
-            compile_policy "$SELINUX_DIR/$SPECIFIC_POLICY"
+        # If the user gave a base name without .te, we already added .te above
+        local te_path="${SELINUX_DIR}/${SPECIFIC_POLICY}"
+        if [[ -f "$te_path" ]]; then
+            compile_policy "$te_path"
         else
             log_error "Policy file not found: $SPECIFIC_POLICY"
         fi
@@ -166,6 +188,7 @@ main() {
     echo ""
     echo "Compiled policies in: $BUILD_DIR"
     echo "To install: sudo ./scripts/compile-selinux.sh --install"
+    echo "To compile and install a specific policy: sudo ./scripts/compile-selinux.sh <policy_name> --install"
 }
 
 main "$@"

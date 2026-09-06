@@ -1,0 +1,97 @@
+policy_module(mayotix, 1.0)
+
+########################################
+#
+# Declarations
+#
+########################################
+
+type mayotix_t;
+type mayotix_exec_t;
+type mayotix_lib_t;
+type mayotix_var_lib_t;
+type mayotix_etc_t;
+type mayotix_log_t;
+type mayotix_tmp_t;
+type mayotix_dev_t;
+type mayotix_kernel_t;
+
+# Files
+files_type(mayotix_exec_t)
+files_type(mayotix_lib_t)
+files_type(mayotix_var_lib_t)
+files_type(mayotix_etc_t)
+files_type(mayotix_log_t)
+files_type(mayotix_tmp_t)
+files_type(mayotix_dev_t)
+files_type(mayotix_kernel_t)
+
+########################################
+#
+# mayotix local policy
+#
+########################################
+
+# Allow the domain to transition to itself when executing mayotix_exec_t
+type_transition unconfined_t mayotix_exec_t:process mayotix_t;
+type_transition init_t mayotix_exec_t:process mayotix_t;
+
+# Allow the domain to execute mayotix_exec_t
+allow mayotix_t mayotix_exec_t:file { execute execute_no_trans read open };
+allow mayotix_t mayotix_lib_t:file { read open };
+
+# Allow reading and writing to var/lib
+allow mayotix_t mayotix_var_lib_t:dir { search add_name remove_name create write };
+allow mayotix_t mayotix_var_lib_t:file { create read write open unlink link rename };
+
+# Allow reading etc
+allow mayotix_t mayotix_etc_t:dir { search };
+allow mayotix_t mayotix_etc_t:file { read open };
+
+# Allow writing to log
+allow mayotix_t mayotix_log_t:dir { search add_name };
+allow mayotix_t mayotix_log_t:file { create write open append };
+
+# Allow using tmp
+allow mayotix_t mayotix_tmp_t:dir { search add_name remove_name };
+allow mayotix_t mayotix_tmp_t:file { create read write open unlink link rename };
+
+# Allow reading kernel (for modules, etc.)
+allow mayotix_t mayotix_kernel_t:dir { search };
+allow mayotix_t mayotix_kernel_t:file { read open };
+
+# Allow accessing devices (if needed)
+allow mayotix_t mayotix_dev_t:chr_file { read write };
+allow mayotix_t mayotix_dev_t:blk_file { read write };
+
+# Basic permissions
+allow mayotix_t self:capability { sys_admin sys_tty_config sys_resource };
+allow mayotix_t self:process { siginh noatsecure rlimitinh setrlimit };
+allow mayotix_t self:unix_stream_socket { create connectto };
+allow mayotix_t self:unix_dgram_socket { create sendto };
+
+# Network (if needed)
+allow mayotix_t self:tcp_socket { name_bind name_connect };
+allow mayotix_t self:udp_socket { name_bind name_connect };
+
+# Logging
+allow mayotix_t auditd_t:fd { use };
+
+# Miscellaneous
+allow mayotix_t self:netlink_kobject_uevent_socket { create nlmsg_relay };
+allow mayotix_t self:netlink_audit_socket { create nlmsg_relay };
+allow mayotix_t self:netlink_selinux_socket { create nlmsg_relay };
+allow mayotix_t self:netlink_tcpdiag_socket { create nlmsg_relay };
+allow mayotix_t self:netlink_ip6fw_socket { create nlmsg_relay };
+allow mayotix_t self:netlink_dnrt_socket { create nlmsg_relay };
+allow mayotix_t self:netlink_scsi_socket { create nlmsg_relay };
+allow mayotix_t self:netlink_callback_socket { create nlmsg_relay };
+allow mayotix_t self:netlink_sockdiag_socket { create nlmsg_relay };
+allow mayotix_t self:netlink_iscsi_socket { create nlmsg_relay };
+allow mayotix_t self:netlink_fib_lookup_socket { create nlmsg_relay };
+allow mayotix_t self:netlink_netfilter_socket { create nlmsg_relay };
+allow mayotix_t self:netlink_xfrm_socket { create nlmsg_relay };
+allow mayotix_t self:netlink_iscsi_socket { create nlmsg_relay };
+allow mayotix_t self:netlink_fib_lookup_socket { create nlmsg_relay };
+allow mayotix_t self:netlink_netfilter_socket { create nlmsg_relay };
+allow mayotix_t self:netlink_xfrm_socket { create nlmsg_relay };

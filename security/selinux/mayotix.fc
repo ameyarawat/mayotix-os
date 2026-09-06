@@ -1,0 +1,26 @@
+# File context definitions for MAYOTIX SELinux policy
+
+# Executables
+/usr/libexec/mayotix.*				--		system_u:object_r:mayotix_exec_t:s0
+
+# Libraries
+/usr/lib(64)?/mayotix/.*\.so		--		system_u:object_r:mayotix_lib_t:s0
+
+# Variable lib directories
+/var/lib/mayotix(/.*)?			--		system_u:object_r:mayotix_var_lib_t:s0
+
+# Configuration files
+/etc/mayotix(/.*)?				--		system_u:object_r:mayotix_etc_t:s0
+
+# Log files
+/var/log/mayotix(/.*)?			--		system_u:object_r:mayotix_log_t:s0
+
+# Temporary directories
+/tmp/mayotix(/.*)?				--		system_u:object_r:mayotix_tmp_t:s0
+/run/mayotix(/.*)?				--		system_u:object_r:mayotix_tmp_t:s0
+
+# Device nodes (if any)
+/dev/mayotix.*					--		system_u:object_r:mayotix_dev_t:s0
+
+# Kernel modules (if any)
+/lib(64)?/modules/.*/mayotix.*		--		system_u:object_r:mayotix_kernel_t:s0
