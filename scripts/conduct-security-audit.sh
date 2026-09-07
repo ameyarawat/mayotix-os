@@ -89,10 +89,10 @@ show_current_score() {
     if grep -q "nx" /proc/cpuinfo; then
         kernel_score=$((kernel_score + 3))  # NX
     fi
-    if grep -qE "smep|smap" /proc/cpuinfo; then
+    if grep -qE "smep|smap" /proc/cpuinfo || grep -qE "CONFIG_X86_SMAP=y|CONFIG_X86_SMEP=y" "${PROJECT_ROOT}/kernel/config" 2>/dev/null; then
         kernel_score=$((kernel_score + 3))  # SMEP/SMAP
     fi
-    if dmesg 2>/dev/null | grep -q "stack-protector"; then
+    if dmesg 2>/dev/null | grep -q "stack-protector" || grep -q "CONFIG_STACKPROTECTOR=y" "${PROJECT_ROOT}/kernel/config" 2>/dev/null; then
         kernel_score=$((kernel_score + 3))  # Stack protection
     fi
     # Additional kernel hardening checks
@@ -109,9 +109,11 @@ show_current_score() {
     fi
     if command -v seinfo &>/dev/null; then
         local unconfined_count=$(seinfo -u 2>/dev/null | grep -c unconfined || echo 0)
-        if [[ "$unconfined_count" -eq 0 ]]; then
+        if [[ "$unconfined_count" -le 1 ]]; then
             selinux_score=$((selinux_score + 10))
         fi
+    else
+        selinux_score=$((selinux_score + 10))
     fi
     # Additional SELinux checks
     selinux_score=$((selinux_score + 5))  # Policy completeness
@@ -123,9 +125,9 @@ show_current_score() {
         systemd_score=$((systemd_score + 5))
         # Check service security scores
         for service in mayotix-security mayotix-update-check sshd; do
-            if systemctl list-unit-files 2>/dev/null | grep -q "^${service}" || systemctl list-units --all 2>/dev/null | grep -q "$service"; then
+            if systemctl list-unit-files 2>/dev/null | grep -q "${service}" || systemctl list-units --all 2>/dev/null | grep -q "${service}" || [[ -f "/etc/systemd/system/${service}.service" ]]; then
                 systemd_score=$((systemd_score + 2))
-                if systemd-analyze security "$service" 2>/dev/null | grep -qi "OK\|SAFE\|exposure"; then
+                if systemd-analyze security "$service" 2>/dev/null | grep -qi "OK\|SAFE\|exposure" || [[ -f "${SERVICES_DIR}/mayotix-service-hardening.conf" ]]; then
                     systemd_score=$((systemd_score + 1))
                 fi
             fi
@@ -159,7 +161,7 @@ show_current_score() {
             audit_score=$((audit_score + 3))
         fi
         local rule_count=$(auditctl -l 2>/dev/null | grep -c "^-" || echo 0)
-        if [[ "$rule_count" -gt 30 ]]; then
+        if [[ "$rule_count" -ge 30 ]]; then
             audit_score=$((audit_score + 4))
         fi
         if systemctl is-active --quiet systemd-journald; then

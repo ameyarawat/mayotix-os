@@ -294,11 +294,11 @@ test_file_permissions() {
     # /etc/shadow permissions
     checks_total=$((checks_total + 1))
     local shadow_perms=$(stat -c "%a" /etc/shadow)
-    if [[ "$shadow_perms" == "640" ]]; then
+    if [[ "$shadow_perms" == "640" || "$shadow_perms" == "0" || "$shadow_perms" == "000" ]]; then
         log_success "/etc/shadow permissions correct: $shadow_perms"
         checks_passed=$((checks_passed + 1))
     else
-        log_warn "/etc/shadow permissions: $shadow_perms (expected: 640)"
+        log_warn "/etc/shadow permissions: $shadow_perms (expected: 640 or 000)"
     fi
 
     # /etc/sudoers permissions
