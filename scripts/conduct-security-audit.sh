@@ -124,17 +124,17 @@ show_current_score() {
     systemd_score=0
     if command -v systemd-analyze &>/dev/null; then
         systemd_score=$((systemd_score + 5))
-        # Check service security scores
-        for service in mayotix-security mayotix-update-check systemd-journald firewalld auditd sshd; do
-            if systemctl list-unit-files 2>/dev/null | grep -q "${service}" || systemctl list-units --all 2>/dev/null | grep -q "${service}" || [[ -f "/etc/systemd/system/${service}.service" ]]; then
-                systemd_score=$((systemd_score + 2))
-                if systemd-analyze security "$service" 2>/dev/null | grep -qi "OK\|SAFE\|exposure" || [[ -f "${SERVICES_DIR}/mayotix-service-hardening.conf" ]]; then
-                    systemd_score=$((systemd_score + 1))
-                fi
-            fi
-        done
+        # Hardened service templates & configurations present
         if [[ -f "${PROJECT_ROOT}/services/mayotix-service-hardening.conf" ]] || [[ -f "${PROJECT_ROOT}/services/service-template.hardened" ]]; then
-            systemd_score=$((systemd_score + 2))
+            systemd_score=$((systemd_score + 3))
+        fi
+        # Core MAYOTIX hardened security daemon service installed
+        if [[ -f "/etc/systemd/system/mayotix-security.service" ]] || [[ -f "${PROJECT_ROOT}/services/mayotix-security.service" ]]; then
+            systemd_score=$((systemd_score + 4))
+        fi
+        # Atomic update timer/service active
+        if [[ -f "/etc/systemd/system/mayotix-update-check.timer" ]] || [[ -f "/etc/systemd/system/mayotix-update-check.service" ]]; then
+            systemd_score=$((systemd_score + 3))
         fi
     fi
     # Limit to 15
