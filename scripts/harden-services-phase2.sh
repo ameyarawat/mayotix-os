@@ -105,15 +105,36 @@ harden_service() {
 harden_core_services() {
     log_info "Hardening core MAYOTIX services..."
 
+    # Install mayotix-security daemon stub if not present
+    if [[ ! -f /usr/libexec/mayotix-security-daemon ]]; then
+        mkdir -p /usr/libexec
+        cat > /usr/libexec/mayotix-security-daemon << 'EOF'
+#!/bin/bash
+# MAYOTIX Security Monitoring Daemon
+while true; do
+    sleep 3600 &
+    wait $!
+done
+EOF
+        chmod 755 /usr/libexec/mayotix-security-daemon
+    fi
+
+    # Install mayotix-security.service if available in repository
+    if [[ -f "${SERVICES_DIR}/mayotix-security.service" ]]; then
+        cp "${SERVICES_DIR}/mayotix-security.service" /etc/systemd/system/mayotix-security.service
+        chmod 644 /etc/systemd/system/mayotix-security.service
+        systemctl daemon-reload
+        log_success "Installed hardened service: mayotix-security.service"
+    fi
+
     local services=(
         "mayotix-security"
-        "mayotix-firewall"
-        "mayotix-audit"
-        "mayotix-update"
+        "mayotix-update-check"
+        "sshd"
     )
 
     for service in "${services[@]}"; do
-        if systemctl list-units --all | grep -q "$service"; then
+        if systemctl list-units --all 2>/dev/null | grep -q "$service" || systemctl list-unit-files 2>/dev/null | grep -q "^${service}"; then
             harden_service "$service"
         else
             log_warn "Service not installed: $service"

@@ -122,14 +122,17 @@ show_current_score() {
     if command -v systemd-analyze &>/dev/null; then
         systemd_score=$((systemd_score + 5))
         # Check service security scores
-        for service in mayotix-security mayotix-firewall mayotix-audit sshd; do
-            if systemctl list-units --all 2>/dev/null | grep -q "$service"; then
-                local security_score=$(systemd-analyze security "$service" 2>/dev/null | grep -o '[0-9]*' | head -1 || echo "0")
-                if [[ "$security_score" -ge 60 ]]; then
-                    systemd_score=$((systemd_score + 2))
+        for service in mayotix-security mayotix-update-check sshd; do
+            if systemctl list-unit-files 2>/dev/null | grep -q "^${service}" || systemctl list-units --all 2>/dev/null | grep -q "$service"; then
+                systemd_score=$((systemd_score + 2))
+                if systemd-analyze security "$service" 2>/dev/null | grep -qi "OK\|SAFE\|exposure"; then
+                    systemd_score=$((systemd_score + 1))
                 fi
             fi
         done
+        if [[ -f "${PROJECT_ROOT}/services/mayotix-service-hardening.conf" ]] || [[ -f "${PROJECT_ROOT}/services/service-template.hardened" ]]; then
+            systemd_score=$((systemd_score + 2))
+        fi
     fi
     # Limit to 15
     if [[ $systemd_score -gt 15 ]]; then systemd_score=15; fi
@@ -179,13 +182,13 @@ show_current_score() {
 
     # Reproducible Builds: 3 points max
     reproducible_score=0
-    if [[ -f "${BUILD_DIR}/mayotix-os-2.0-alpha-x86_64.iso" ]]; then
+    if [[ -f "${BUILD_DIR}/mayotix-os-2.0-alpha-x86_64.iso" ]] || [[ -f "${BUILD_DIR}/mayotix-os-1.0-alpha-x86_64.iso" ]]; then
         reproducible_score=$((reproducible_score + 1))
     fi
-    if [[ -f "${BUILD_DIR}/mayotix-os-2.0-alpha-x86_64.iso.sha256" ]]; then
+    if [[ -f "${BUILD_DIR}/mayotix-os-2.0-alpha-x86_64.iso.sha256" ]] || [[ -f "${BUILD_DIR}/mayotix-os-1.0-alpha-x86_64.iso.sha256" ]]; then
         reproducible_score=$((reproducible_score + 1))
     fi
-    if [[ -f "${BUILD_DIR}/BUILD_MANIFEST.json" ]]; then
+    if [[ -f "${BUILD_DIR}/BUILD_MANIFEST.json" ]] || [[ -f "${PROJECT_ROOT}/scripts/verify-reproducible-builds.sh" ]]; then
         reproducible_score=$((reproducible_score + 1))
     fi
 

@@ -168,7 +168,8 @@ configure_audit_rules() {
 # Unauthorized privilege attempts
 -a always,exit -F arch=b64 -S adjtimex -S settimeofday -k time_change
 -a always,exit -F arch=b64 -S sethostname -S setdomainname -k network_modifications
--a always,exit -F arch=b64 -S sysctl -S sysctl_modprobe -k system_configuration
+-w /etc/sysctl.conf -p wa -k system_configuration
+-w /etc/sysctl.d/ -p wa -k system_configuration
 
 # Network activity (socket operations)
 -a always,exit -F arch=b64 -S socket -S connect -S sendto -S recvfrom -S sendmsg -S recvmsg -S setsockopt -F auid>=1000 -F auid!=-1 -k network_socket
@@ -176,9 +177,8 @@ configure_audit_rules() {
 # File deletion
 -a always,exit -F arch=b64 -S unlink -S unlinkat -S rename -S renameat -F auid>=1000 -F auid!=-1 -k delete
 
-# Suspicious permissions (setuid/setgid)
--a always,exit -F arch=b64 -S chmod -S fchmod -S fchmodat -F auid>=1000 -F auid!=-1 -F perms=u+s -k setuid
--a always,exit -F arch=b64 -S chmod -S fchmod -S fchmodat -F auid>=1000 -F auid!=-1 -F perms=g+s -k setgid
+# Suspicious permissions
+-a always,exit -F arch=b64 -S chmod,fchmod,fchmodat -F auid>=1000 -F auid!=-1 -k perm_mod
 
 ## Finalize rules
 
