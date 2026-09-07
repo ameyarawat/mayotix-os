@@ -101,7 +101,7 @@ allow mayotix_t self:unix_dgram_socket { create sendto };
 
 # Network access (controlled)
 allow mayotix_t self:tcp_socket { create name_bind name_connect };
-allow mayotix_t self:udp_socket { create name_bind name_connect };
+allow mayotix_t self:udp_socket { create name_bind };
 
 # Audit logging
 allow mayotix_t auditd_t:fd { use };
