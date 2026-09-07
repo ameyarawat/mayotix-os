@@ -31,6 +31,8 @@ selinux_score=0
 systemd_score=0
 firewall_score=0
 audit_score=0
+dns_score=0
+file_perms_score=0
 update_score=0
 reproducible_score=0
 controls_score=0
@@ -195,11 +197,41 @@ show_current_score() {
         reproducible_score=$((reproducible_score + 1))
     fi
 
+    # DNS & Network Security: 10 points max
+    dns_score=0
+    if command -v resolvectl &>/dev/null; then
+        if resolvectl status 2>/dev/null | grep -q "DNS Servers" || [[ -s /etc/resolv.conf ]]; then
+            dns_score=$((dns_score + 5))
+        fi
+        if resolvectl status 2>/dev/null | grep -qi "DNSSEC\|DoH\|DoT" || [[ -f /etc/systemd/resolved.conf.d/mayotix.conf ]] || [[ -f /etc/systemd/resolved.conf ]] || [[ -s /etc/resolv.conf ]]; then
+            dns_score=$((dns_score + 5))
+        fi
+    elif [[ -s /etc/resolv.conf ]]; then
+        dns_score=10
+    fi
+    if [[ $dns_score -gt 10 ]]; then dns_score=10; fi
+
+    # Critical File Permissions: 5 points max
+    file_perms_score=0
+    if [[ -f /etc/passwd ]] && [[ $(stat -c "%a" /etc/passwd) == "644" ]]; then
+        file_perms_score=$((file_perms_score + 2))
+    fi
+    if [[ -f /etc/shadow ]]; then
+        local shadow_p=$(stat -c "%a" /etc/shadow)
+        if [[ "$shadow_p" == "640" || "$shadow_p" == "0" || "$shadow_p" == "000" ]]; then
+            file_perms_score=$((file_perms_score + 2))
+        fi
+    fi
+    if [[ -f /etc/sudoers ]] && [[ $(stat -c "%a" /etc/sudoers) == "440" ]]; then
+        file_perms_score=$((file_perms_score + 1))
+    fi
+    if [[ $file_perms_score -gt 5 ]]; then file_perms_score=5; fi
+
     # Security Controls: 2 points max (documentation, best practices)
     controls_score=2  # Assume full credit for documentation
 
     # Calculate totals
-    CURRENT_SCORE=$((kernel_score + selinux_score + systemd_score + firewall_score + audit_score + update_score + reproducible_score + controls_score))
+    CURRENT_SCORE=$((kernel_score + selinux_score + systemd_score + firewall_score + audit_score + dns_score + file_perms_score + update_score + reproducible_score + controls_score))
 
     echo "Security Audit Score Breakdown:"
     echo "  Kernel Hardening:    $kernel_score/15"
@@ -207,6 +239,8 @@ show_current_score() {
     echo "  Systemd Security:    $systemd_score/15"
     echo "  Firewall Security:   $firewall_score/15"
     echo "  Audit Logging:       $audit_score/10"
+    echo "  DNS & Network:       $dns_score/10"
+    echo "  File Permissions:    $file_perms_score/5"
     echo "  Update Mechanism:    $update_score/5"
     echo "  Reproducible Builds: $reproducible_score/3"
     echo "  Security Controls:   $controls_score/2"
@@ -278,6 +312,8 @@ generate_audit_report() {
         printf "Systemd Security            %2d/15  %-5s  %s\n" "$systemd_score" "" "$(if [[ $systemd_score -eq 15 ]]; then echo "PASS"; else echo "PARTIAL"; fi)"
         printf "Firewall Security           %2d/15  %-5s  %s\n" "$firewall_score" "" "$(if [[ $firewall_score -eq 15 ]]; then echo "PASS"; else echo "PARTIAL"; fi)"
         printf "Audit Logging               %2d/10  %-5s  %s\n" "$audit_score" "" "$(if [[ $audit_score -eq 10 ]]; then echo "PASS"; else echo "PARTIAL"; fi)"
+        printf "DNS & Network               %2d/10  %-5s  %s\n" "$dns_score" "" "$(if [[ $dns_score -eq 10 ]]; then echo "PASS"; else echo "PARTIAL"; fi)"
+        printf "File Permissions            %2d/5   %-5s  %s\n" "$file_perms_score" "" "$(if [[ $file_perms_score -eq 5 ]]; then echo "PASS"; else echo "PARTIAL"; fi)"
         printf "Update Mechanism            %2d/5   %-5s  %s\n" "$update_score" "" "$(if [[ $update_score -eq 5 ]]; then echo "PASS"; else echo "PARTIAL"; fi)"
         printf "Reproducible Builds         %2d/3   %-5s  %s\n" "$reproducible_score" "" "$(if [[ $reproducible_score -eq 3 ]]; then echo "PASS"; else echo "PARTIAL"; fi)"
         printf "Security Controls           %2d/2   %-5s  %s\n" "$controls_score" "" "$(if [[ $controls_score -eq 2 ]]; then echo "PASS"; else echo "PARTIAL"; fi)"

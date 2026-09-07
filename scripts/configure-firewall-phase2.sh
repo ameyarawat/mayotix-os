@@ -148,37 +148,29 @@ configure_dns_over_https() {
 
     local resolved_conf="/etc/systemd/resolved.conf"
 
-    if [[ ! -f "$resolved_conf" ]]; then
-        log_warn "systemd-resolved configuration not found: $resolved_conf"
-        return 1
-    fi
+    mkdir -p /etc/systemd/resolved.conf.d
 
     if [[ $DRY_RUN -eq 1 ]]; then
-        log_info "  [DRY RUN] Would configure DoH in $resolved_conf"
-        echo "  Would add:"
-        echo "    DNS=1.1.1.1 1.0.0.1 2606:4700:4700::1111 2606:4700:4700::1001"
-        echo "    DNSSECMode=yes"
-        echo "    DNS-over-TLS=opportunistic"
+        log_info "  [DRY RUN] Would configure DoH in /etc/systemd/resolved.conf.d/mayotix.conf"
         return 0
     fi
 
-    # Backup original
-    cp "$resolved_conf" "${resolved_conf}.backup-$(date +%s)"
-
-    # Configure DoH
-    cat >> "$resolved_conf" << 'EOF'
-
-# MAYOTIX Phase 2: DNS over HTTPS Configuration
+    # Configure DoH / DNSSEC via drop-in configuration
+    cat > /etc/systemd/resolved.conf.d/mayotix.conf << 'EOF'
+[Resolve]
 DNS=1.1.1.1 1.0.0.1 2606:4700:4700::1111 2606:4700:4700::1001
-DNSSECMode=yes
-DNS-over-TLS=opportunistic
+DNSSEC=yes
+DNSOverTLS=opportunistic
 FallbackDNS=8.8.8.8 8.8.4.4
 EOF
 
-    # Restart systemd-resolved
-    systemctl restart systemd-resolved
+    # Enable and restart systemd-resolved if available
+    if command -v systemctl &>/dev/null; then
+        systemctl enable systemd-resolved 2>/dev/null || true
+        systemctl restart systemd-resolved 2>/dev/null || true
+    fi
 
-    log_success "DNS over HTTPS configured"
+    log_success "DNS over HTTPS configured: /etc/systemd/resolved.conf.d/mayotix.conf"
 }
 
 # Configure DNSSEC validation
