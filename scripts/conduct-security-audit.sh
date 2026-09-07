@@ -25,6 +25,14 @@ DRY_RUN=0
 REPORT_ONLY=0
 TARGET_SCORE=85
 CURRENT_SCORE=0
+kernel_score=0
+selinux_score=0
+systemd_score=0
+firewall_score=0
+audit_score=0
+update_score=0
+reproducible_score=0
+controls_score=0
 
 log_info() { echo -e "${BLUE}[INFO]${NC} $*"; }
 log_success() { echo -e "${GREEN}[✓]${NC} $*"; }
@@ -51,11 +59,11 @@ check_prerequisites() {
 
     # Check for required tools
     local required_tools=(
-        "systemctl"
-        "auditctl"
+        "systemd-analyze"
         "firewall-cmd"
+        "auditctl"
         "getenforce"
-        "resolvectl"
+        "semodule"
         "sha256sum"
     )
 
@@ -74,7 +82,7 @@ show_current_score() {
     echo ""
 
     # Kernel Hardening: 15 points max
-    local kernel_score=0
+    kernel_score=0
     if [[ -r /proc/sys/kernel/randomize_va_space ]] && [[ $(cat /proc/sys/kernel/randomize_va_space) == "2" ]]; then
         kernel_score=$((kernel_score + 3))  # ASLR
     fi
@@ -84,7 +92,7 @@ show_current_score() {
     if grep -qE "smep|smap" /proc/cpuinfo; then
         kernel_score=$((kernel_score + 3))  # SMEP/SMAP
     fi
-    if dmesg | grep -q "stack-protector"; then
+    if dmesg 2>/dev/null | grep -q "stack-protector"; then
         kernel_score=$((kernel_score + 3))  # Stack protection
     fi
     # Additional kernel hardening checks
@@ -92,7 +100,7 @@ show_current_score() {
     if [[ $kernel_score -gt 15 ]]; then kernel_score=15; fi
 
     # SELinux Enforcing: 20 points max
-    local selinux_score=0
+    selinux_score=0
     if command -v getenforce &>/dev/null && [[ $(getenforce) == "Enforcing" ]]; then
         selinux_score=$((selinux_score + 5))
     fi
@@ -110,12 +118,12 @@ show_current_score() {
     if [[ $selinux_score -gt 20 ]]; then selinux_score=20; fi
 
     # Systemd Security: 15 points max
-    local systemd_score=0
+    systemd_score=0
     if command -v systemd-analyze &>/dev/null; then
         systemd_score=$((systemd_score + 5))
         # Check service security scores
         for service in mayotix-security mayotix-firewall mayotix-audit sshd; do
-            if systemctl list-units --all | grep -q "$service"; then
+            if systemctl list-units --all 2>/dev/null | grep -q "$service"; then
                 local security_score=$(systemd-analyze security "$service" 2>/dev/null | grep -o '[0-9]*' | head -1 || echo "0")
                 if [[ "$security_score" -ge 60 ]]; then
                     systemd_score=$((systemd_score + 2))
@@ -127,7 +135,7 @@ show_current_score() {
     if [[ $systemd_score -gt 15 ]]; then systemd_score=15; fi
 
     # Firewall Security: 15 points max
-    local firewall_score=0
+    firewall_score=0
     if command -v firewall-cmd &>/dev/null; then
         if firewall-cmd --state &>/dev/null; then
             firewall_score=$((firewall_score + 5))
@@ -135,19 +143,19 @@ show_current_score() {
         if firewall-cmd --zone=public --query-service=ssh &>/dev/null; then
             firewall_score=$((firewall_score + 5))
         fi
-        if ! firewall-cmd --zone=public --list-all | grep -q "target.*accept" && \
-           firewall-cmd --zone=public --get-target | grep -q "drop\|reject"; then
+        if ! firewall-cmd --zone=public --list-all 2>/dev/null | grep -q "target.*accept" && \
+           firewall-cmd --permanent --zone=public --get-target 2>/dev/null | grep -qi "drop\|reject"; then
             firewall_score=$((firewall_score + 5))  # Default deny
         fi
     fi
 
     # Audit Logging: 10 points max
-    local audit_score=0
+    audit_score=0
     if command -v auditctl &>/dev/null; then
         if systemctl is-active --quiet auditd; then
             audit_score=$((audit_score + 3))
         fi
-        local rule_count=$(auditctl -l | grep -c "^-" || echo 0)
+        local rule_count=$(auditctl -l 2>/dev/null | grep -c "^-" || echo 0)
         if [[ "$rule_count" -gt 30 ]]; then
             audit_score=$((audit_score + 4))
         fi
@@ -158,7 +166,7 @@ show_current_score() {
     if [[ $audit_score -gt 10 ]]; then audit_score=10; fi
 
     # Update Mechanism: 5 points max
-    local update_score=0
+    update_score=0
     if [[ -f /etc/mayotix/updates.conf ]]; then
         update_score=$((update_score + 2))
     fi
@@ -170,7 +178,7 @@ show_current_score() {
     fi
 
     # Reproducible Builds: 3 points max
-    local reproducible_score=0
+    reproducible_score=0
     if [[ -f "${BUILD_DIR}/mayotix-os-2.0-alpha-x86_64.iso" ]]; then
         reproducible_score=$((reproducible_score + 1))
     fi
@@ -182,7 +190,7 @@ show_current_score() {
     fi
 
     # Security Controls: 2 points max (documentation, best practices)
-    local controls_score=2  # Assume full credit for documentation
+    controls_score=2  # Assume full credit for documentation
 
     # Calculate totals
     CURRENT_SCORE=$((kernel_score + selinux_score + systemd_score + firewall_score + audit_score + update_score + reproducible_score + controls_score))
