@@ -1,0 +1,813 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MAYOTIX Phase 2 Week 5 - Security Verification Tracker</title>
+
+<style>
+:root {
+  --bg: #fafbfc;
+  --surface: #ffffff;
+  --border: #d0d7de;
+  --text: #24292e;
+  --text-secondary: #57606a;
+  --accent: #0969da;
+  --success: #1a7f0f;
+  --warning: #9e6a03;
+  --error: #da3633;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0d1117;
+    --surface: #161b22;
+    --border: #30363d;
+    --text: #c9d1d9;
+    --text-secondary: #8b949e;
+    --accent: #58a6ff;
+    --success: #3fb950;
+    --warning: #d29922;
+    --error: #f85149;
+  }
+}
+
+:root[data-theme="dark"] {
+  --bg: #0d1117;
+  --surface: #161b22;
+  --border: #30363d;
+  --text: #c9d1d9;
+  --text-secondary: #8b949e;
+  --accent: #58a6ff;
+  --success: #3fb950;
+  --warning: #d29922;
+  --error: #f85149;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+  line-height: 1.5;
+  padding: 2rem 1rem;
+}
+
+.container { max-width: 1200px; margin: 0 auto; }
+
+header {
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 2rem;
+  margin-bottom: 2rem;
+}
+
+h1 {
+  font-size: 2rem;
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+  text-wrap: balance;
+}
+
+.header-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 2rem;
+  flex-wrap: wrap;
+  margin-top: 1rem;
+}
+
+.meta-item {
+  font-size: 0.95rem;
+}
+
+.meta-label {
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 0.25rem;
+}
+
+.score-display {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 1rem;
+  margin-top: 1.5rem;
+}
+
+.score-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 1rem;
+  text-align: center;
+}
+
+.score-value {
+  font-size: 2.5rem;
+  font-weight: 700;
+  color: var(--accent);
+  margin-bottom: 0.25rem;
+}
+
+.score-label {
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-secondary);
+}
+
+.progress-container {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 1.5rem;
+  margin-bottom: 2rem;
+}
+
+.progress-title {
+  font-weight: 600;
+  margin-bottom: 1rem;
+  font-size: 1.1rem;
+}
+
+.progress-bar {
+  height: 12px;
+  background: var(--border);
+  border-radius: 6px;
+  overflow: hidden;
+  margin-bottom: 1rem;
+}
+
+.progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent), var(--success));
+  transition: width 0.3s ease;
+}
+
+.progress-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.stat {
+  text-align: center;
+  padding: 0.5rem;
+}
+
+.stat-value {
+  font-size: 1.8rem;
+  font-weight: 700;
+  color: var(--accent);
+}
+
+.stat-label {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  margin-top: 0.25rem;
+}
+
+.days-container {
+  display: grid;
+  gap: 1.5rem;
+  margin-bottom: 2rem;
+}
+
+.day-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.day-header {
+  background: linear-gradient(135deg, rgba(9, 105, 218, 0.1), rgba(88, 166, 255, 0.05));
+  padding: 1rem;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.day-title {
+  font-weight: 600;
+  font-size: 1.05rem;
+}
+
+.day-subtitle {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  margin-top: 0.25rem;
+}
+
+.day-status {
+  display: inline-block;
+  padding: 0.4rem 0.8rem;
+  border-radius: 12px;
+  font-size: 0.85rem;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.day-status.pending {
+  background: rgba(139, 148, 158, 0.1);
+  color: var(--text-secondary);
+}
+
+.day-status.in-progress {
+  background: rgba(88, 166, 255, 0.15);
+  color: var(--accent);
+}
+
+.day-status.completed {
+  background: rgba(63, 185, 80, 0.15);
+  color: var(--success);
+}
+
+.day-content {
+  padding: 1.5rem;
+}
+
+.task-list {
+  list-style: none;
+  margin: 0;
+}
+
+.task-item {
+  display: flex;
+  gap: 0.75rem;
+  padding: 0.75rem;
+  border-radius: 6px;
+  margin-bottom: 0.5rem;
+  background: rgba(0, 0, 0, 0.02);
+  align-items: flex-start;
+}
+
+.task-item input[type="checkbox"] {
+  margin-top: 0.25rem;
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.task-item.completed {
+  opacity: 0.65;
+}
+
+.task-item.completed label {
+  text-decoration: line-through;
+  color: var(--text-secondary);
+}
+
+.task-item label {
+  cursor: pointer;
+  flex: 1;
+  font-size: 0.95rem;
+}
+
+.expected-results {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border);
+  background: rgba(0, 0, 0, 0.01);
+  padding: 1rem;
+  border-radius: 6px;
+}
+
+.results-label {
+  font-weight: 600;
+  font-size: 0.9rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-secondary);
+  margin-bottom: 0.5rem;
+}
+
+.result-item {
+  display: flex;
+  gap: 0.5rem;
+  padding: 0.35rem 0;
+  font-size: 0.9rem;
+  color: var(--text);
+}
+
+.result-item::before {
+  content: "✓";
+  color: var(--success);
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.notes-area {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border);
+}
+
+.notes-label {
+  font-weight: 600;
+  font-size: 0.9rem;
+  margin-bottom: 0.5rem;
+  display: block;
+}
+
+.notes-input {
+  width: 100%;
+  min-height: 70px;
+  padding: 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--bg);
+  color: var(--text);
+  font-family: inherit;
+  font-size: 0.9rem;
+  resize: vertical;
+}
+
+.decision-section {
+  background: var(--surface);
+  border: 2px solid var(--border);
+  border-radius: 8px;
+  padding: 2rem;
+  margin-bottom: 2rem;
+}
+
+.decision-title {
+  font-size: 1.2rem;
+  font-weight: 600;
+  margin-bottom: 1.5rem;
+}
+
+.criteria-list {
+  display: grid;
+  gap: 0.75rem;
+  margin-bottom: 1.5rem;
+}
+
+.criteria-item {
+  display: flex;
+  gap: 0.75rem;
+  padding: 0.75rem;
+  background: linear-gradient(135deg, rgba(63, 185, 80, 0.08), rgba(86, 211, 100, 0.08));
+  border-radius: 6px;
+  border-left: 3px solid var(--success);
+  font-size: 0.95rem;
+}
+
+.criteria-item.unmet {
+  background: linear-gradient(135deg, rgba(248, 81, 73, 0.08), rgba(255, 123, 114, 0.08));
+  border-left-color: var(--error);
+}
+
+.criteria-item::before {
+  content: "✓";
+  color: var(--success);
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.criteria-item.unmet::before {
+  content: "✗";
+  color: var(--error);
+}
+
+.final-decision {
+  background: linear-gradient(135deg, rgba(9, 105, 218, 0.05), rgba(88, 166, 255, 0.05));
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  padding: 1rem;
+  margin-top: 1.5rem;
+}
+
+.decision-label {
+  font-weight: 600;
+  margin-bottom: 0.75rem;
+  font-size: 0.95rem;
+}
+
+.decision-select {
+  width: 100%;
+  padding: 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--surface);
+  color: var(--text);
+  font-size: 0.95rem;
+  cursor: pointer;
+}
+
+@media (max-width: 768px) {
+  .header-row {
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  .day-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.75rem;
+  }
+
+  .score-display {
+    grid-template-columns: 1fr;
+  }
+}
+</style>
+</head>
+<body>
+
+<div class="container">
+  <header>
+    <div style="display: flex; justify-content: space-between; align-items: baseline; gap: 1rem; flex-wrap: wrap;">
+      <div>
+        <h1>MAYOTIX OS Phase 2 - Week 5</h1>
+        <p style="color: var(--text-secondary); font-size: 0.95rem; margin-top: 0.5rem;">Security Verification & Go/No-Go Decision</p>
+      </div>
+      <div class="day-status in-progress" style="padding: 0.5rem 1rem;">In Progress</div>
+    </div>
+
+    <div class="header-row" style="margin-top: 1.5rem;">
+      <div class="meta-item">
+        <div class="meta-label">Target Score</div>
+        <div style="font-size: 1.1rem; font-weight: 600;">≥85/100</div>
+      </div>
+      <div class="meta-item">
+        <div class="meta-label">Current Baseline</div>
+        <div style="font-size: 1.1rem; font-weight: 600;">92/100</div>
+      </div>
+      <div class="meta-item">
+        <div class="meta-label">Deadline</div>
+        <div style="font-size: 1.1rem; font-weight: 600;">Sep 21, 2026</div>
+      </div>
+      <div class="meta-item">
+        <div class="meta-label">Duration</div>
+        <div style="font-size: 1.1rem; font-weight: 600;">13–16 hours</div>
+      </div>
+    </div>
+
+    <div class="score-display">
+      <div class="score-card">
+        <div class="score-value" id="currentScore">92</div>
+        <div class="score-label">Security Score</div>
+      </div>
+      <div class="score-card">
+        <div class="score-value" id="completionPct">0%</div>
+        <div class="score-label">Week 5 Progress</div>
+      </div>
+      <div class="score-card">
+        <div class="score-value" id="tasksComplete">0</div>
+        <div class="score-label">Tasks Completed</div>
+      </div>
+      <div class="score-card">
+        <div class="score-value" id="daysComplete">0</div>
+        <div class="score-label">Days Completed</div>
+      </div>
+    </div>
+  </header>
+
+  <div class="progress-container">
+    <div class="progress-title">Week 5 Execution Progress</div>
+    <div class="progress-bar">
+      <div class="progress-fill" id="progressFill" style="width: 0%;"></div>
+    </div>
+    <div class="progress-stats">
+      <div class="stat">
+        <div class="stat-value" id="tasksDone">0/28</div>
+        <div class="stat-label">Tasks</div>
+      </div>
+      <div class="stat">
+        <div class="stat-value" id="daysDone">0/5</div>
+        <div class="stat-label">Days</div>
+      </div>
+      <div class="stat">
+        <div class="stat-value" id="hoursUsed">0h</div>
+        <div class="stat-label">Time Used</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="days-container" id="daysContainer"></div>
+
+  <div class="decision-section">
+    <div class="decision-title">Go/No-Go Decision Criteria</div>
+
+    <div style="margin-bottom: 2rem;">
+      <div style="font-weight: 600; margin-bottom: 1rem; font-size: 0.95rem;">✓ GO Criteria (Proceed to Week 6)</div>
+      <div class="criteria-list">
+        <div class="criteria-item">
+          <span>Security score: ≥85/100</span>
+        </div>
+        <div class="criteria-item">
+          <span>All acceptance criteria: Met (8/8)</span>
+        </div>
+        <div class="criteria-item">
+          <span>All tests: Passing</span>
+        </div>
+        <div class="criteria-item">
+          <span>No critical vulnerabilities</span>
+        </div>
+        <div class="criteria-item">
+          <span>Build reproducibility: Verified</span>
+        </div>
+        <div class="criteria-item">
+          <span>Update mechanism: Functional</span>
+        </div>
+      </div>
+    </div>
+
+    <div style="margin-bottom: 1.5rem;">
+      <div style="font-weight: 600; margin-bottom: 1rem; font-size: 0.95rem;">✗ NO-GO Criteria (Continue Week 5)</div>
+      <div class="criteria-list">
+        <div class="criteria-item unmet">
+          <span>Security score: <85/100</span>
+        </div>
+        <div class="criteria-item unmet">
+          <span>Any critical vulnerabilities</span>
+        </div>
+        <div class="criteria-item unmet">
+          <span>Tests failing</span>
+        </div>
+        <div class="criteria-item unmet">
+          <span>Acceptance criteria not met</span>
+        </div>
+        <div class="criteria-item unmet">
+          <span>Build reproducibility issues</span>
+        </div>
+        <div class="criteria-item unmet">
+          <span>Update mechanism problems</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="final-decision">
+      <div class="decision-label">Final Go/No-Go Decision:</div>
+      <select class="decision-select" id="finalDecision">
+        <option value="">Select decision...</option>
+        <option value="go">✓ GO – Proceed to Week 6 Release</option>
+        <option value="no-go">✗ NO-GO – Address gaps and re-test</option>
+      </select>
+    </div>
+  </div>
+</div>
+
+<script>
+const dayDefinitions = [
+  {
+    num: 1,
+    title: "Security Audit Setup & Baseline",
+    subtitle: "2–3 hours",
+    tasks: [
+      "Verify prerequisites: sudo ./scripts/conduct-security-audit.sh --report-only",
+      "Check kernel hardening: cat /proc/cmdline | grep mitigations=",
+      "Verify ASLR: cat /proc/sys/kernel/randomize_va_space",
+      "Check CPU mitigations: grep -E \"smep|smap\" /proc/cpuinfo",
+      "Verify SELinux enforcing: getenforce",
+      "Check SELinux modules: semodule -l | grep mayotix"
+    ],
+    results: [
+      "Kernel hardening: 8+ options enabled",
+      "SELinux: Enforcing mode, custom policy loaded",
+      "Firewall: Active, default-deny inbound",
+      "Audit: auditd running, 40+ rules loaded",
+      "Updates: Service enabled, GPG configured"
+    ]
+  },
+  {
+    num: 2,
+    title: "Service Hardening Verification",
+    subtitle: "2–3 hours",
+    tasks: [
+      "Run systemd analyzer: sudo systemd-analyze security",
+      "Score mayotix-security: sudo systemd-analyze security mayotix-security",
+      "Score mayotix-firewall: sudo systemd-analyze security mayotix-firewall",
+      "Score mayotix-audit: sudo systemd-analyze security mayotix-audit",
+      "Verify hardening directives: sudo systemctl cat mayotix-security | grep -E \"^[A-Z].*=\"",
+      "Check unconfined processes: ps -eZ | grep unconfined | wc -l"
+    ],
+    results: [
+      "All core services: security score ≥60%",
+      "Hardening directives: ≥20 per service",
+      "No unconfined processes running",
+      "SSH: PrivateTmp enabled, NoNewPrivileges active"
+    ]
+  },
+  {
+    num: 3,
+    title: "Firewall & Audit Rule Verification",
+    subtitle: "2–3 hours",
+    tasks: [
+      "Verify firewall rules: sudo firewall-cmd --zone=public --list-ports",
+      "List firewall services: sudo firewall-cmd --zone=public --list-services",
+      "Inspect nftables rules: sudo nft list ruleset | head -50",
+      "Verify audit rules count: sudo auditctl -l | grep -E \"^-a|-w\" | wc -l",
+      "Test audit logging: sudo ausearch -m INTEGRITY_DATA | head -5",
+      "Check log rotation: cat /etc/logrotate.d/auditd && ls -lh /var/log/audit/"
+    ],
+    results: [
+      "Firewall: Default-deny, SSH only open service",
+      "Audit rules: ≥40 rules loaded and active",
+      "Logs: Rotating, persistent, accessible",
+      "DNS: DoH/DNSSEC configured and active"
+    ]
+  },
+  {
+    num: 4,
+    title: "Update Mechanism & Reproducibility Testing",
+    subtitle: "3–4 hours",
+    tasks: [
+      "Check update timer: systemctl status mayotix-update-check.timer",
+      "Review update log: cat /var/log/mayotix-update-check.log",
+      "Test dry-run: sudo /usr/libexec/mayotix-update-check --dry-run --status",
+      "Verify rollback: ls -la /var/lib/mayotix/rollback/",
+      "Build reproducible ISO: sudo ./scripts/build-iso-phase2.sh --reproducible",
+      "Verify checksums: sha256sum -c build/*.sha256",
+      "Compare ISO reproducibility: ./scripts/verify-reproducible-builds.sh --verbose"
+    ],
+    results: [
+      "Update timer: Scheduled for 3 AM daily",
+      "Dry-run: Completes without errors",
+      "Rollback: 3 previous versions available",
+      "ISO: Reproducible across builds",
+      "Checksums: All valid",
+      "Manifest: Complete component tracking"
+    ]
+  },
+  {
+    num: 5,
+    title: "Comprehensive Security Test & Report",
+    subtitle: "2–3 hours",
+    tasks: [
+      "Run security tests: sudo ./scripts/test-security-phase2.sh --verbose",
+      "Generate audit report: sudo ./scripts/conduct-security-audit.sh",
+      "Review audit findings: cat build/SECURITY_AUDIT_REPORT.txt",
+      "Test kernel hardening: cat /proc/sys/kernel/randomize_va_space",
+      "Test SELinux: getenforce && echo OK",
+      "Test firewall: sudo firewall-cmd --state",
+      "Make go/no-go decision"
+    ],
+    results: [
+      "All security tests: PASS",
+      "Security score: ≥85/100 (expected: 92/100)",
+      "No critical vulnerabilities",
+      "All components functioning",
+      "Ready for Phase 2 release"
+    ]
+  }
+];
+
+function renderDays() {
+  const container = document.getElementById('daysContainer');
+  container.innerHTML = dayDefinitions.map((day, idx) => `
+    <div class="day-card">
+      <div class="day-header">
+        <div>
+          <div class="day-title">Day ${day.num}: ${day.title}</div>
+          <div class="day-subtitle">${day.subtitle}</div>
+        </div>
+        <div class="day-status pending" id="day${day.num}-status">Pending</div>
+      </div>
+      <div class="day-content">
+        <ul class="task-list">
+          ${day.tasks.map((task, tidx) => `
+            <li class="task-item">
+              <input type="checkbox" id="d${day.num}t${tidx}" data-day="${day.num}">
+              <label for="d${day.num}t${tidx}">${task}</label>
+            </li>
+          `).join('')}
+        </ul>
+
+        <div class="expected-results">
+          <div class="results-label">Expected Results</div>
+          ${day.results.map(r => `<div class="result-item">${r}</div>`).join('')}
+        </div>
+
+        <div class="notes-area">
+          <label class="notes-label" for="day${day.num}-notes">Notes & Findings:</label>
+          <textarea class="notes-input" id="day${day.num}-notes" placeholder="Record findings, errors, or issues here..."></textarea>
+        </div>
+      </div>
+    </div>
+  `).join('');
+
+  // Attach event listeners
+  document.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+    cb.addEventListener('change', updateProgress);
+  });
+
+  document.querySelectorAll('textarea').forEach(ta => {
+    ta.addEventListener('change', saveProgress);
+  });
+
+  document.getElementById('finalDecision').addEventListener('change', saveProgress);
+
+  loadProgress();
+}
+
+function updateProgress() {
+  let totalTasks = 0;
+  let completedTasks = 0;
+  const dayStatus = {};
+
+  // Count tasks per day
+  for (let day = 1; day <= 5; day++) {
+    const dayTasks = document.querySelectorAll(`input[data-day="${day}"]`);
+    let dayCompleted = 0;
+
+    dayTasks.forEach(task => {
+      totalTasks++;
+      if (task.checked) {
+        completedTasks++;
+        dayCompleted++;
+      }
+      task.closest('.task-item').classList.toggle('completed', task.checked);
+    });
+
+    dayStatus[day] = { completed: dayCompleted, total: dayTasks.length };
+
+    // Update day status badge
+    const statusEl = document.getElementById(`day${day}-status`);
+    if (dayCompleted === dayTasks.length && dayTasks.length > 0) {
+      statusEl.className = 'day-status completed';
+      statusEl.textContent = '✓ Completed';
+    } else if (dayCompleted > 0) {
+      statusEl.className = 'day-status in-progress';
+      statusEl.textContent = `${dayCompleted}/${dayTasks.length} Tasks`;
+    } else {
+      statusEl.className = 'day-status pending';
+      statusEl.textContent = 'Pending';
+    }
+  }
+
+  // Update UI
+  const pct = Math.round((completedTasks / totalTasks) * 100);
+  document.getElementById('progressFill').style.width = pct + '%';
+  document.getElementById('completionPct').textContent = pct + '%';
+  document.getElementById('tasksComplete').textContent = completedTasks;
+  document.getElementById('tasksDone').textContent = `${completedTasks}/${totalTasks}`;
+
+  const daysComplete = Object.values(dayStatus).filter(d => d.completed === d.total && d.total > 0).length;
+  document.getElementById('daysComplete').textContent = daysComplete;
+  document.getElementById('daysDone').textContent = `${daysComplete}/5`;
+
+  saveProgress();
+}
+
+function saveProgress() {
+  const state = {
+    tasks: {},
+    notes: {},
+    finalDecision: document.getElementById('finalDecision').value
+  };
+
+  document.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+    state.tasks[cb.id] = cb.checked;
+  });
+
+  document.querySelectorAll('textarea').forEach(ta => {
+    state.notes[ta.id] = ta.value;
+  });
+
+  try {
+    localStorage.setItem('mayotix-week5-tracker', JSON.stringify(state));
+  } catch (e) {
+    console.log('Could not save to localStorage');
+  }
+}
+
+function loadProgress() {
+  try {
+    const saved = localStorage.getItem('mayotix-week5-tracker');
+    if (saved) {
+      const state = JSON.parse(saved);
+
+      Object.entries(state.tasks).forEach(([id, checked]) => {
+        const el = document.getElementById(id);
+        if (el) el.checked = checked;
+      });
+
+      Object.entries(state.notes).forEach(([id, value]) => {
+        const el = document.getElementById(id);
+        if (el) el.value = value;
+      });
+
+      if (state.finalDecision) {
+        document.getElementById('finalDecision').value = state.finalDecision;
+      }
+
+      updateProgress();
+    }
+  } catch (e) {
+    console.log('Could not load from localStorage');
+  }
+}
+
+renderDays();
+</script>
+
+</body>
+</html>

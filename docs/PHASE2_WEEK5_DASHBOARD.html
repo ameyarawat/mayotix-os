@@ -1,0 +1,969 @@
+<title>MAYOTIX Phase 2 Week 5 Verification Dashboard</title>
+
+<style>
+:root {
+  --bg: #fafbfc;
+  --surface: #ffffff;
+  --text: #24292e;
+  --text-secondary: #57606a;
+  --border: #d0d7de;
+  --accent: #0969da;
+  --accent-light: #54aeff;
+  --success: #1a7f0f;
+  --success-light: #26843b;
+  --warning: #9e6a03;
+  --warning-light: #d29922;
+  --error: #da3633;
+  --error-light: #f85149;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0d1117;
+    --surface: #161b22;
+    --text: #c9d1d9;
+    --text-secondary: #8b949e;
+    --border: #30363d;
+    --accent: #58a6ff;
+    --accent-light: #79c0ff;
+    --success: #3fb950;
+    --success-light: #56d364;
+    --warning: #d29922;
+    --warning-light: #f0883e;
+    --error: #f85149;
+    --error-light: #ff7b72;
+  }
+}
+
+:root[data-theme="dark"] {
+  --bg: #0d1117;
+  --surface: #161b22;
+  --text: #c9d1d9;
+  --text-secondary: #8b949e;
+  --border: #30363d;
+  --accent: #58a6ff;
+  --accent-light: #79c0ff;
+  --success: #3fb950;
+  --success-light: #56d364;
+  --warning: #d29922;
+  --warning-light: #f0883e;
+  --error: #f85149;
+  --error-light: #ff7b72;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+  line-height: 1.5;
+  color-scheme: light dark;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  padding: 2rem 1rem;
+}
+
+.container {
+  max-width: 1000px;
+  margin: 0 auto;
+}
+
+header {
+  margin-bottom: 3rem;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 2rem;
+}
+
+h1 {
+  font-size: 2rem;
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+  text-wrap: balance;
+}
+
+.header-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.5rem;
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+  margin-top: 1rem;
+}
+
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.4rem 0.8rem;
+  border-radius: 12px;
+  font-weight: 500;
+  font-size: 0.85rem;
+}
+
+.status-badge.in-progress {
+  background: rgba(89, 166, 255, 0.1);
+  color: var(--accent);
+}
+
+.status-badge.completed {
+  background: rgba(63, 185, 80, 0.1);
+  color: var(--success);
+}
+
+.status-badge.pending {
+  background: rgba(139, 148, 158, 0.1);
+  color: var(--text-secondary);
+}
+
+.score-display {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  margin-top: 1.5rem;
+}
+
+.score-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 1rem;
+  text-align: center;
+}
+
+.score-value {
+  font-size: 2rem;
+  font-weight: 700;
+  color: var(--accent);
+  margin-bottom: 0.25rem;
+}
+
+.score-label {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.days-grid {
+  display: grid;
+  gap: 1.5rem;
+  margin: 2rem 0;
+}
+
+.day-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.day-header {
+  background: linear-gradient(135deg, rgba(89, 166, 255, 0.1), rgba(88, 166, 255, 0.05));
+  padding: 1rem;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.day-title {
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+.day-status {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+}
+
+.day-content {
+  padding: 1.5rem;
+}
+
+.objective {
+  margin-bottom: 1.5rem;
+}
+
+.objective-label {
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-secondary);
+  margin-bottom: 0.5rem;
+  font-weight: 600;
+}
+
+.objective-text {
+  font-size: 1rem;
+  color: var(--text);
+  margin-bottom: 1rem;
+}
+
+.task-list {
+  list-style: none;
+  margin: 1rem 0;
+}
+
+.task-item {
+  display: flex;
+  gap: 0.75rem;
+  padding: 0.75rem;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.02);
+  margin-bottom: 0.5rem;
+  font-size: 0.9rem;
+}
+
+.task-item input[type="checkbox"] {
+  margin-top: 0.25rem;
+  cursor: pointer;
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+}
+
+.task-item.completed {
+  opacity: 0.6;
+}
+
+.task-item.completed label {
+  text-decoration: line-through;
+  color: var(--text-secondary);
+}
+
+.task-item label {
+  flex: 1;
+  cursor: pointer;
+}
+
+.expected-results {
+  margin-top: 1.5rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border);
+}
+
+.results-label {
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-secondary);
+  margin-bottom: 0.5rem;
+  font-weight: 600;
+}
+
+.result-item {
+  padding: 0.5rem 0;
+  font-size: 0.9rem;
+  color: var(--text);
+  display: flex;
+  gap: 0.5rem;
+}
+
+.result-item::before {
+  content: "✓";
+  color: var(--success);
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.notes-section {
+  background: linear-gradient(135deg, rgba(158, 106, 3, 0.05), rgba(242, 173, 68, 0.05));
+  border: 1px solid var(--warning-light);
+  border-radius: 6px;
+  padding: 1rem;
+  margin-top: 1.5rem;
+  font-size: 0.9rem;
+}
+
+.notes-section textarea {
+  width: 100%;
+  min-height: 80px;
+  padding: 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--surface);
+  color: var(--text);
+  font-family: inherit;
+  font-size: 0.9rem;
+  margin-top: 0.5rem;
+  resize: vertical;
+}
+
+.progress-summary {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 1.5rem;
+  margin-bottom: 2rem;
+}
+
+.summary-title {
+  font-size: 1.1rem;
+  font-weight: 600;
+  margin-bottom: 1rem;
+}
+
+.progress-bar {
+  height: 8px;
+  background: var(--border);
+  border-radius: 4px;
+  overflow: hidden;
+  margin-bottom: 1rem;
+}
+
+.progress-fill {
+  height: 100%;
+  background: var(--accent);
+  width: 0%;
+  transition: width 0.3s ease;
+}
+
+.summary-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 1rem;
+}
+
+.stat {
+  text-align: center;
+}
+
+.stat-value {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--accent);
+}
+
+.stat-label {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  margin-top: 0.25rem;
+}
+
+.go-no-go {
+  background: var(--surface);
+  border: 2px solid var(--border);
+  border-radius: 8px;
+  padding: 1.5rem;
+  margin-top: 2rem;
+}
+
+.go-no-go-title {
+  font-size: 1.1rem;
+  font-weight: 600;
+  margin-bottom: 1rem;
+}
+
+.go-criteria {
+  display: grid;
+  gap: 0.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.criteria-item {
+  display: flex;
+  gap: 0.75rem;
+  padding: 0.75rem;
+  background: linear-gradient(135deg, rgba(63, 185, 80, 0.05), rgba(86, 211, 100, 0.05));
+  border-radius: 6px;
+  font-size: 0.9rem;
+}
+
+.criteria-item.unmet {
+  background: linear-gradient(135deg, rgba(248, 81, 73, 0.05), rgba(255, 123, 114, 0.05));
+}
+
+.criteria-item::before {
+  content: "✓";
+  color: var(--success);
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.criteria-item.unmet::before {
+  content: "✗";
+  color: var(--error);
+}
+
+@media (max-width: 640px) {
+  h1 {
+    font-size: 1.5rem;
+  }
+
+  .header-meta {
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+
+  .score-display {
+    grid-template-columns: 1fr;
+  }
+
+  .summary-stats {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+</style>
+
+<div class="container">
+  <header>
+    <div style="display: flex; align-items: baseline; justify-content: space-between; gap: 1rem;">
+      <h1>MAYOTIX OS Phase 2 Week 5</h1>
+      <span class="status-badge in-progress">In Progress</span>
+    </div>
+    <div class="header-meta">
+      <div><strong>Target:</strong> ≥85/100 security score</div>
+      <div><strong>Current:</strong> 92/100 (Week 4 baseline)</div>
+      <div><strong>Deadline:</strong> September 21, 2026</div>
+      <div><strong>Duration:</strong> 13–16 hours</div>
+    </div>
+
+    <div class="score-display">
+      <div class="score-card">
+        <div class="score-value" id="finalScore">92</div>
+        <div class="score-label">Security Score</div>
+      </div>
+      <div class="score-card">
+        <div class="score-value" id="completionRate">0%</div>
+        <div class="score-label">Week 5 Progress</div>
+      </div>
+    </div>
+  </header>
+
+  <div class="progress-summary">
+    <div class="summary-title">Week 5 Execution Progress</div>
+    <div class="progress-bar">
+      <div class="progress-fill" id="progressFill" style="width: 0%"></div>
+    </div>
+    <div class="summary-stats">
+      <div class="stat">
+        <div class="stat-value" id="tasksCompleted">0</div>
+        <div class="stat-label">Tasks Completed</div>
+      </div>
+      <div class="stat">
+        <div class="stat-value" id="tasksTotal">28</div>
+        <div class="stat-label">Total Tasks</div>
+      </div>
+      <div class="stat">
+        <div class="stat-value" id="daysCompleted">0</div>
+        <div class="stat-label">Days Completed</div>
+      </div>
+      <div class="stat">
+        <div class="stat-value" id="daysTotal">5</div>
+        <div class="stat-label">Total Days</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="days-grid">
+    <!-- DAY 1 -->
+    <div class="day-card">
+      <div class="day-header">
+        <div>
+          <div class="day-title">Day 1: Security Audit Setup & Baseline</div>
+          <div style="font-size: 0.9rem; color: var(--text-secondary); margin-top: 0.25rem;">2–3 hours</div>
+        </div>
+        <div class="day-status">
+          <span class="status-badge pending" id="day1-status">Pending</span>
+        </div>
+      </div>
+      <div class="day-content">
+        <div class="objective">
+          <div class="objective-label">Objective</div>
+          <div class="objective-text">Establish audit baseline and verify all security controls are active</div>
+        </div>
+
+        <ul class="task-list">
+          <li class="task-item">
+            <input type="checkbox" id="d1t1">
+            <label for="d1t1">Verify prerequisites: <code>sudo ./scripts/conduct-security-audit.sh --report-only</code></label>
+          </li>
+          <li class="task-item">
+            <input type="checkbox" id="d1t2">
+            <label for="d1t2">Check kernel hardening: <code>cat /proc/cmdline | grep mitigations=</code></label>
+          </li>
+          <li class="task-item">
+            <input type="checkbox" id="d1t3">
+            <label for="d1t3">Verify ASLR: <code>cat /proc/sys/kernel/randomize_va_space</code></label>
+          </li>
+          <li class="task-item">
+            <input type="checkbox" id="d1t4">
+            <label for="d1t4">Check CPU mitigations: <code>grep -E "smep|smap" /proc/cpuinfo</code></label>
+          </li>
+          <li class="task-item">
+            <input type="checkbox" id="d1t5">
+            <label for="d1t5">Verify SELinux enforcing: <code>getenforce</code></label>
+          </li>
+          <li class="task-item">
+            <input type="checkbox" id="d1t6">
+            <label for="d1t6">Check SELinux modules: <code>semodule -l | grep mayotix</code></label>
+          </li>
+        </ul>
+
+        <div class="expected-results">
+          <div class="results-label">Expected Results</div>
+          <div class="result-item">Kernel hardening: 8+ options enabled</div>
+          <div class="result-item">SELinux: Enforcing mode, custom policy loaded</div>
+          <div class="result-item">Firewall: Active, default-deny inbound</div>
+          <div class="result-item">Audit: auditd running, 40+ rules loaded</div>
+          <div class="result-item">Updates: Service enabled, GPG configured</div>
+        </div>
+
+        <div class="notes-section">
+          <strong>Day 1 Notes:</strong>
+          <textarea id="day1-notes" placeholder="Record findings, errors, or issues here..."></textarea>
+        </div>
+      </div>
+    </div>
+
+    <!-- DAY 2 -->
+    <div class="day-card">
+      <div class="day-header">
+        <div>
+          <div class="day-title">Day 2: Service Hardening Verification</div>
+          <div style="font-size: 0.9rem; color: var(--text-secondary); margin-top: 0.25rem;">2–3 hours</div>
+        </div>
+        <div class="day-status">
+          <span class="status-badge pending" id="day2-status">Pending</span>
+        </div>
+      </div>
+      <div class="day-content">
+        <div class="objective">
+          <div class="objective-label">Objective</div>
+          <div class="objective-text">Validate systemd service security hardening is complete</div>
+        </div>
+
+        <ul class="task-list">
+          <li class="task-item">
+            <input type="checkbox" id="d2t1">
+            <label for="d2t1">Run systemd analyzer: <code>sudo systemd-analyze security</code></label>
+          </li>
+          <li class="task-item">
+            <input type="checkbox" id="d2t2">
+            <label for="d2t2">Score mayotix-security service: <code>sudo systemd-analyze security mayotix-security</code></label>
+          </li>
+          <li class="task-item">
+            <input type="checkbox" id="d2t3">
+            <label for="d2t3">Score mayotix-firewall service: <code>sudo systemd-analyze security mayotix-firewall</code></label>
+          </li>
+          <li class="task-item">
+            <input type="checkbox" id="d2t4">
+            <label for="d2t4">Score mayotix-audit service: <code>sudo systemd-analyze security mayotix-audit</code></label>
+          </li>
+          <li class="task-item">
+            <input type="checkbox" id="d2t5">
+            <label for="d2t5">Verify hardening directives: <code>sudo systemctl cat mayotix-security | grep -E "^[A-Z].*="</code></label>
+          </li>
+          <li class="task-item">
+            <input type="checkbox" id="d2t6">
+            <label for="d2t6">Check for unconfined processes: <code>ps -eZ | grep unconfined | wc -l</code></label>
+          </li>
+        </ul>
+
+        <div class="expected-results">
+          <div class="result-item">All core services: security score ≥60%</div>
+          <div class="result-item">Hardening directives: ≥20 per service</div>
+          <div class="result-item">No unconfined processes running</div>
+          <div class="result-item">SSH: PrivateTmp enabled, NoNewPrivileges active</div>
+        </div>
+
+        <div class="notes-section">
+          <strong>Day 2 Notes:</strong>
+          <textarea id="day2-notes" placeholder="Record findings, errors, or issues here..."></textarea>
+        </div>
+      </div>
+    </div>
+
+    <!-- DAY 3 -->
+    <div class="day-card">
+      <div class="day-header">
+        <div>
+          <div class="day-title">Day 3: Firewall & Audit Rule Verification</div>
+          <div style="font-size: 0.9rem; color: var(--text-secondary); margin-top: 0.25rem;">2–3 hours</div>
+        </div>
+        <div class="day-status">
+          <span class="status-badge pending" id="day3-status">Pending</span>
+        </div>
+      </div>
+      <div class="day-content">
+        <div class="objective">
+          <div class="objective-label">Objective</div>
+          <div class="objective-text">Validate firewall rules and audit logging completeness</div>
+        </div>
+
+        <ul class="task-list">
+          <li class="task-item">
+            <input type="checkbox" id="d3t1">
+            <label for="d3t1">Verify firewall rules: <code>sudo firewall-cmd --zone=public --list-ports</code></label>
+          </li>
+          <li class="task-item">
+            <input type="checkbox" id="d3t2">
+            <label for="d3t2">List firewall services: <code>sudo firewall-cmd --zone=public --list-services</code></label>
+          </li>
+          <li class="task-item">
+            <input type="checkbox" id="d3t3">
+            <label for="d3t3">Inspect nftables rules: <code>sudo nft list ruleset | head -50</code></label>
+          </li>
+          <li class="task-item">
+            <input type="checkbox" id="d3t4">
+            <label for="d3t4">Verify audit rules count: <code>sudo auditctl -l | grep -E "^-a|-w" | wc -l</code></label>
+          </li>
+          <li class="task-item">
+            <input type="checkbox" id="d3t5">
+            <label for="d3t5">Test audit logging: <code>sudo ausearch -m INTEGRITY_DATA | head -5</code></label>
+          </li>
+          <li class="task-item">
+            <input type="checkbox" id="d3t6">
+            <label for="d3t6">Check log rotation: <code>cat /etc/logrotate.d/auditd && ls -lh /var/log/audit/</code></label>
+          </li>
+        </ul>
+
+        <div class="expected-results">
+          <div class="result-item">Firewall: Default-deny, SSH only open service</div>
+          <div class="result-item">Audit rules: ≥40 rules loaded and active</div>
+          <div class="result-item">Logs: Rotating, persistent, accessible</div>
+          <div class="result-item">DNS: DoH/DNSSEC configured and active</div>
+        </div>
+
+        <div class="notes-section">
+          <strong>Day 3 Notes:</strong>
+          <textarea id="day3-notes" placeholder="Record findings, errors, or issues here..."></textarea>
+        </div>
+      </div>
+    </div>
+
+    <!-- DAY 4 -->
+    <div class="day-card">
+      <div class="day-header">
+        <div>
+          <div class="day-title">Day 4: Update Mechanism & Reproducibility Testing</div>
+          <div style="font-size: 0.9rem; color: var(--text-secondary); margin-top: 0.25rem;">3–4 hours</div>
+        </div>
+        <div class="day-status">
+          <span class="status-badge pending" id="day4-status">Pending</span>
+        </div>
+      </div>
+      <div class="day-content">
+        <div class="objective">
+          <div class="objective-label">Objective</div>
+          <div class="objective-text">Verify atomic updates and reproducible builds are functioning</div>
+        </div>
+
+        <ul class="task-list">
+          <li class="task-item">
+            <input type="checkbox" id="d4t1">
+            <label for="d4t1">Check update timer: <code>systemctl status mayotix-update-check.timer</code></label>
+          </li>
+          <li class="task-item">
+            <input type="checkbox" id="d4t2">
+            <label for="d4t2">Review update log: <code>cat /var/log/mayotix-update-check.log</code></label>
+          </li>
+          <li class="task-item">
+            <input type="checkbox" id="d4t3">
+            <label for="d4t3">Test dry-run: <code>sudo /usr/libexec/mayotix-update-check --dry-run --status</code></label>
+          </li>
+          <li class="task-item">
+            <input type="checkbox" id="d4t4">
+            <label for="d4t4">Verify rollback: <code>ls -la /var/lib/mayotix/rollback/</code></label>
+          </li>
+          <li class="task-item">
+            <input type="checkbox" id="d4t5">
+            <label for="d4t5">Build reproducible ISO: <code>sudo ./scripts/build-iso-phase2.sh --reproducible</code></label>
+          </li>
+          <li class="task-item">
+            <input type="checkbox" id="d4t6">
+            <label for="d4t6">Verify checksums: <code>sha256sum -c build/*.sha256</code></label>
+          </li>
+          <li class="task-item">
+            <input type="checkbox" id="d4t7">
+            <label for="d4t7">Compare ISO reproducibility: <code>./scripts/verify-reproducible-builds.sh --verbose</code></label>
+          </li>
+        </ul>
+
+        <div class="expected-results">
+          <div class="result-item">Update timer: Scheduled for 3 AM daily</div>
+          <div class="result-item">Dry-run: Completes without errors</div>
+          <div class="result-item">Rollback: 3 previous versions available</div>
+          <div class="result-item">ISO: Reproducible across builds</div>
+          <div class="result-item">Checksums: All valid</div>
+          <div class="result-item">Manifest: Complete component tracking</div>
+        </div>
+
+        <div class="notes-section">
+          <strong>Day 4 Notes:</strong>
+          <textarea id="day4-notes" placeholder="Record findings, errors, or issues here..."></textarea>
+        </div>
+      </div>
+    </div>
+
+    <!-- DAY 5 -->
+    <div class="day-card">
+      <div class="day-header">
+        <div>
+          <div class="day-title">Day 5: Comprehensive Security Test & Report</div>
+          <div style="font-size: 0.9rem; color: var(--text-secondary); margin-top: 0.25rem;">2–3 hours</div>
+        </div>
+        <div class="day-status">
+          <span class="status-badge pending" id="day5-status">Pending</span>
+        </div>
+      </div>
+      <div class="day-content">
+        <div class="objective">
+          <div class="objective-label">Objective</div>
+          <div class="objective-text">Run full security suite and generate final audit report</div>
+        </div>
+
+        <ul class="task-list">
+          <li class="task-item">
+            <input type="checkbox" id="d5t1">
+            <label for="d5t1">Run security tests: <code>sudo ./scripts/test-security-phase2.sh --verbose</code></label>
+          </li>
+          <li class="task-item">
+            <input type="checkbox" id="d5t2">
+            <label for="d5t2">Generate audit report: <code>sudo ./scripts/conduct-security-audit.sh</code></label>
+          </li>
+          <li class="task-item">
+            <input type="checkbox" id="d5t3">
+            <label for="d5t3">Review audit findings: <code>cat build/SECURITY_AUDIT_REPORT.txt</code></label>
+          </li>
+          <li class="task-item">
+            <input type="checkbox" id="d5t4">
+            <label for="d5t4">Test kernel hardening: <code>cat /proc/sys/kernel/randomize_va_space</code></label>
+          </li>
+          <li class="task-item">
+            <input type="checkbox" id="d5t5">
+            <label for="d5t5">Test SELinux: <code>getenforce && echo "OK"</code></label>
+          </li>
+          <li class="task-item">
+            <input type="checkbox" id="d5t6">
+            <label for="d5t6">Test firewall: <code>sudo firewall-cmd --state</code></label>
+          </li>
+          <li class="task-item">
+            <input type="checkbox" id="d5t7">
+            <label for="d5t7">Make go/no-go decision</label>
+          </li>
+        </ul>
+
+        <div class="expected-results">
+          <div class="result-item">All security tests: PASS</div>
+          <div class="result-item">Security score: ≥85/100 (expected: 92/100)</div>
+          <div class="result-item">No critical vulnerabilities</div>
+          <div class="result-item">All components functioning</div>
+          <div class="result-item">Ready for Phase 2 release</div>
+        </div>
+
+        <div class="notes-section">
+          <strong>Day 5 Notes & Final Score:</strong>
+          <textarea id="day5-notes" placeholder="Record final findings and security score here..."></textarea>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- GO/NO-GO CRITERIA -->
+  <div class="go-no-go">
+    <div class="go-no-go-title">Go/No-Go Decision Criteria</div>
+
+    <div style="margin-bottom: 1.5rem;">
+      <div style="font-weight: 600; margin-bottom: 0.75rem; font-size: 0.95rem;">✓ GO Criteria (Proceed to Week 6)</div>
+      <div class="go-criteria">
+        <div class="criteria-item">
+          <span>Security score: ≥85/100</span>
+        </div>
+        <div class="criteria-item">
+          <span>All acceptance criteria: Met (8/8)</span>
+        </div>
+        <div class="criteria-item">
+          <span>All tests: Passing</span>
+        </div>
+        <div class="criteria-item">
+          <span>No critical vulnerabilities</span>
+        </div>
+        <div class="criteria-item">
+          <span>Build reproducibility: Verified</span>
+        </div>
+        <div class="criteria-item">
+          <span>Update mechanism: Functional</span>
+        </div>
+      </div>
+    </div>
+
+    <div style="margin-bottom: 1.5rem;">
+      <div style="font-weight: 600; margin-bottom: 0.75rem; font-size: 0.95rem;">✗ NO-GO Criteria (Continue Week 5)</div>
+      <div class="go-criteria">
+        <div class="criteria-item unmet">
+          <span>Security score: &lt;85/100</span>
+        </div>
+        <div class="criteria-item unmet">
+          <span>Any critical vulnerabilities found</span>
+        </div>
+        <div class="criteria-item unmet">
+          <span>Tests failing</span>
+        </div>
+        <div class="criteria-item unmet">
+          <span>Acceptance criteria not met</span>
+        </div>
+        <div class="criteria-item unmet">
+          <span>Build reproducibility issues</span>
+        </div>
+        <div class="criteria-item unmet">
+          <span>Update mechanism problems</span>
+        </div>
+      </div>
+    </div>
+
+    <div style="background: linear-gradient(135deg, rgba(89, 166, 255, 0.05), rgba(88, 166, 255, 0.05)); border: 1px solid rgba(89, 166, 255, 0.2); border-radius: 6px; padding: 1rem; margin-top: 1rem;">
+      <strong>Final Decision:</strong>
+      <select id="finalDecision" style="display: block; margin-top: 0.75rem; padding: 0.75rem; border: 1px solid var(--border); border-radius: 4px; background: var(--surface); color: var(--text); font-size: 0.95rem;">
+        <option value="">Select decision...</option>
+        <option value="go">✓ GO – Proceed to Week 6</option>
+        <option value="no-go">✗ NO-GO – Address gaps and re-test</option>
+      </select>
+    </div>
+  </div>
+</div>
+
+<script>
+// State management
+const state = {
+  tasks: {},
+  dayStatuses: {},
+  notes: {},
+  finalScore: 92,
+  finalDecision: ''
+};
+
+// Initialize checkboxes
+document.querySelectorAll('input[type="checkbox"]').forEach(checkbox => {
+  checkbox.addEventListener('change', updateProgress);
+});
+
+// Initialize textareas
+document.querySelectorAll('textarea').forEach(textarea => {
+  textarea.addEventListener('change', saveNote);
+});
+
+// Initialize decision select
+document.getElementById('finalDecision').addEventListener('change', (e) => {
+  state.finalDecision = e.target.value;
+  saveState();
+});
+
+function updateProgress() {
+  let totalTasks = 0;
+  let completedTasks = 0;
+
+  document.querySelectorAll('input[type="checkbox"]').forEach(checkbox => {
+    totalTasks++;
+    if (checkbox.checked) completedTasks++;
+
+    // Mark task as completed
+    checkbox.closest('.task-item').classList.toggle('completed', checkbox.checked);
+  });
+
+  // Update day statuses
+  for (let day = 1; day <= 5; day++) {
+    const dayTasks = document.querySelectorAll(`#d${day}t1, #d${day}t2, #d${day}t3, #d${day}t4, #d${day}t5, #d${day}t6, #d${day}t7`);
+    const dayCompleted = Array.from(dayTasks).filter(t => t.checked).length;
+    const dayTotal = dayTasks.length;
+
+    const statusEl = document.getElementById(`day${day}-status`);
+    if (dayCompleted === dayTotal && dayTotal > 0) {
+      statusEl.className = 'status-badge completed';
+      statusEl.textContent = 'Completed';
+    } else if (dayCompleted > 0) {
+      statusEl.className = 'status-badge in-progress';
+      statusEl.textContent = `${dayCompleted}/${dayTotal} Tasks`;
+    } else {
+      statusEl.className = 'status-badge pending';
+      statusEl.textContent = 'Pending';
+    }
+  }
+
+  // Update progress display
+  const completionRate = Math.round((completedTasks / totalTasks) * 100);
+  document.getElementById('completionRate').textContent = completionRate + '%';
+  document.getElementById('tasksCompleted').textContent = completedTasks;
+  document.getElementById('progressFill').style.width = completionRate + '%';
+
+  // Update days completed
+  const daysCompleted = Array.from({length: 5}, (_, i) => {
+    const status = document.getElementById(`day${i+1}-status`);
+    return status.classList.contains('completed') ? 1 : 0;
+  }).reduce((a, b) => a + b);
+  document.getElementById('daysCompleted').textContent = daysCompleted;
+
+  saveState();
+}
+
+function saveNote(e) {
+  const textarea = e.target;
+  const id = textarea.id;
+  state.notes[id] = textarea.value;
+  saveState();
+}
+
+function saveState() {
+  try {
+    localStorage.setItem('mayotix-week5-state', JSON.stringify(state));
+  } catch (e) {
+    console.log('Could not save state to localStorage');
+  }
+}
+
+function loadState() {
+  try {
+    const saved = localStorage.getItem('mayotix-week5-state');
+    if (saved) {
+      Object.assign(state, JSON.parse(saved));
+
+      // Restore checkboxes
+      document.querySelectorAll('input[type="checkbox"]').forEach(checkbox => {
+        if (state.tasks[checkbox.id]) {
+          checkbox.checked = true;
+          checkbox.closest('.task-item').classList.add('completed');
+        }
+      });
+
+      // Restore notes
+      document.querySelectorAll('textarea').forEach(textarea => {
+        if (state.notes[textarea.id]) {
+          textarea.value = state.notes[textarea.id];
+        }
+      });
+
+      // Restore final decision
+      if (state.finalDecision) {
+        document.getElementById('finalDecision').value = state.finalDecision;
+      }
+
+      // Restore score
+      if (state.finalScore) {
+        document.getElementById('finalScore').textContent = state.finalScore;
+      }
+
+      updateProgress();
+    }
+  } catch (e) {
+    console.log('Could not load state from localStorage');
+  }
+}
+
+// Save checkbox state
+document.querySelectorAll('input[type="checkbox"]').forEach(checkbox => {
+  checkbox.addEventListener('change', () => {
+    state.tasks[checkbox.id] = checkbox.checked;
+    saveState();
+  });
+});
+
+// Load state on page load
+loadState();
+</script>
