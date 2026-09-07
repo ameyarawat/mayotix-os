@@ -1,0 +1,943 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>MAYOTIX OS Phase 2: Secure Base System</title>
+    <style>
+        :root {
+            /* Light theme (default) */
+            --bg-primary: #f8f7f6;
+            --bg-secondary: #ffffff;
+            --bg-tertiary: #f0eeec;
+            --text-primary: #1a1816;
+            --text-secondary: #6b6661;
+            --text-muted: #a39f9a;
+            --border-color: #e8e4e0;
+            --accent: #0099ff;
+            --accent-dim: #e6f2ff;
+            --success: #00b84c;
+            --warning: #ff9500;
+            --critical: #ff3b30;
+            --info: #0099ff;
+        }
+
+        @media (prefers-color-scheme: dark) {
+            :root:not([data-theme="light"]) {
+                --bg-primary: #0f0e0d;
+                --bg-secondary: #1a1918;
+                --bg-tertiary: #2a2825;
+                --text-primary: #f5f3f0;
+                --text-secondary: #b8b3ac;
+                --text-muted: #7a7570;
+                --border-color: #3a3630;
+                --accent: #00d4ff;
+                --accent-dim: #001a2e;
+                --success: #00e05e;
+                --warning: #ffb81c;
+                --critical: #ff453a;
+                --info: #00d4ff;
+            }
+        }
+
+        :root[data-theme="dark"] {
+            --bg-primary: #0f0e0d;
+            --bg-secondary: #1a1918;
+            --bg-tertiary: #2a2825;
+            --text-primary: #f5f3f0;
+            --text-secondary: #b8b3ac;
+            --text-muted: #7a7570;
+            --border-color: #3a3630;
+            --accent: #00d4ff;
+            --accent-dim: #001a2e;
+            --success: #00e05e;
+            --warning: #ffb81c;
+            --critical: #ff453a;
+            --info: #00d4ff;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            line-height: 1.6;
+            margin: 0;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        header {
+            margin-bottom: 40px;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 30px;
+        }
+
+        h1 {
+            font-size: 2rem;
+            font-weight: 600;
+            margin: 0 0 8px 0;
+            letter-spacing: -0.02em;
+        }
+
+        .subtitle {
+            font-size: 1rem;
+            color: var(--text-secondary);
+            margin: 0 0 20px 0;
+        }
+
+        .status-badge {
+            display: inline-block;
+            padding: 6px 12px;
+            border-radius: 4px;
+            font-size: 0.85rem;
+            font-weight: 500;
+            letter-spacing: 0.3px;
+            text-transform: uppercase;
+        }
+
+        .status-in-progress {
+            background: var(--accent-dim);
+            color: var(--accent);
+        }
+
+        .status-planned {
+            background: rgba(255, 149, 0, 0.1);
+            color: var(--warning);
+        }
+
+        .status-complete {
+            background: rgba(0, 184, 76, 0.1);
+            color: var(--success);
+        }
+
+        /* Section layout */
+        .section {
+            margin-bottom: 50px;
+        }
+
+        .section-title {
+            font-size: 1.25rem;
+            font-weight: 600;
+            margin: 0 0 24px 0;
+            padding-bottom: 12px;
+            border-bottom: 2px solid var(--accent);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            font-size: 0.95rem;
+        }
+
+        /* Card grid */
+        .card-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+
+        .card {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 12px;
+        }
+
+        .card-title {
+            font-size: 1rem;
+            font-weight: 600;
+            margin: 0;
+            flex: 1;
+        }
+
+        .card-badge {
+            padding: 4px 8px;
+            border-radius: 3px;
+            font-size: 0.75rem;
+            font-weight: 500;
+            white-space: nowrap;
+        }
+
+        .badge-kernel {
+            background: rgba(0, 153, 255, 0.15);
+            color: var(--accent);
+        }
+
+        .badge-selinux {
+            background: rgba(255, 149, 0, 0.15);
+            color: var(--warning);
+        }
+
+        .badge-systemd {
+            background: rgba(0, 184, 76, 0.15);
+            color: var(--success);
+        }
+
+        .badge-firewall {
+            background: rgba(255, 59, 48, 0.15);
+            color: var(--critical);
+        }
+
+        .card-description {
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+            margin: 0;
+        }
+
+        .card-content {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .checkbox-item {
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+        }
+
+        .checkbox-item input {
+            margin-top: 3px;
+            cursor: pointer;
+            accent-color: var(--accent);
+        }
+
+        .checkbox-item input:checked + label {
+            color: var(--text-muted);
+            text-decoration: line-through;
+        }
+
+        .checkbox-item label {
+            cursor: pointer;
+            flex: 1;
+        }
+
+        /* Timeline */
+        .timeline {
+            display: flex;
+            flex-direction: column;
+            gap: 0;
+        }
+
+        .timeline-item {
+            display: flex;
+            gap: 20px;
+            padding: 20px;
+            border-left: 2px solid var(--border-color);
+            position: relative;
+        }
+
+        .timeline-item::before {
+            content: '';
+            position: absolute;
+            left: -7px;
+            top: 28px;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: var(--bg-secondary);
+            border: 2px solid var(--border-color);
+        }
+
+        .timeline-item.active::before {
+            background: var(--accent);
+            border-color: var(--accent);
+        }
+
+        .timeline-item.complete::before {
+            background: var(--success);
+            border-color: var(--success);
+        }
+
+        .timeline-content {
+            flex: 1;
+            padding-top: 4px;
+        }
+
+        .timeline-date {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+            margin-bottom: 4px;
+        }
+
+        .timeline-title {
+            font-size: 1rem;
+            font-weight: 600;
+            margin: 0 0 8px 0;
+        }
+
+        .timeline-description {
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+            margin: 0;
+        }
+
+        /* Table */
+        .table-container {
+            overflow-x: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.9rem;
+        }
+
+        th {
+            background: var(--bg-tertiary);
+            padding: 12px 16px;
+            text-align: left;
+            font-weight: 600;
+            border-bottom: 1px solid var(--border-color);
+            color: var(--text-primary);
+            text-transform: uppercase;
+            font-size: 0.8rem;
+            letter-spacing: 0.3px;
+        }
+
+        td {
+            padding: 12px 16px;
+            border-bottom: 1px solid var(--border-color);
+            color: var(--text-secondary);
+        }
+
+        tr:last-child td {
+            border-bottom: none;
+        }
+
+        /* Statistics */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+
+        .stat-card {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 20px;
+            text-align: center;
+        }
+
+        .stat-number {
+            font-size: 2rem;
+            font-weight: 700;
+            color: var(--accent);
+            margin: 0 0 4px 0;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .stat-label {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            margin: 0;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+        }
+
+        /* Code block */
+        .code-block {
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            padding: 16px;
+            overflow-x: auto;
+            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            margin: 16px 0;
+        }
+
+        .code-block code {
+            display: block;
+            white-space: pre;
+        }
+
+        /* Button */
+        .button {
+            display: inline-block;
+            padding: 10px 20px;
+            background: var(--accent);
+            color: #000;
+            text-decoration: none;
+            border-radius: 4px;
+            font-weight: 600;
+            font-size: 0.9rem;
+            border: none;
+            cursor: pointer;
+            transition: opacity 0.2s;
+        }
+
+        .button:hover {
+            opacity: 0.9;
+        }
+
+        .button-secondary {
+            background: var(--bg-tertiary);
+            color: var(--text-primary);
+            border: 1px solid var(--border-color);
+        }
+
+        /* Divider */
+        .divider {
+            height: 1px;
+            background: var(--border-color);
+            margin: 30px 0;
+        }
+
+        /* Key metrics */
+        .metrics {
+            background: var(--bg-tertiary);
+            border-left: 4px solid var(--accent);
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 4px;
+        }
+
+        .metrics-title {
+            font-weight: 600;
+            font-size: 0.95rem;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+            margin: 0 0 12px 0;
+        }
+
+        .metrics-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 12px;
+            margin: 0;
+        }
+
+        .metrics-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.9rem;
+        }
+
+        .metrics-icon {
+            display: inline-block;
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: var(--accent);
+        }
+
+        /* Footer */
+        footer {
+            border-top: 1px solid var(--border-color);
+            padding-top: 30px;
+            margin-top: 50px;
+            font-size: 0.85rem;
+            color: var(--text-muted);
+        }
+
+        footer p {
+            margin: 0;
+        }
+
+        /* Responsive */
+        @media (max-width: 640px) {
+            body {
+                padding: 12px;
+            }
+
+            h1 {
+                font-size: 1.5rem;
+            }
+
+            .card-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .stats-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>MAYOTIX OS Phase 2</h1>
+            <p class="subtitle">Secure Base System Implementation</p>
+            <span class="status-badge status-in-progress">In Progress</span>
+        </header>
+
+        <!-- Overview -->
+        <div class="section">
+            <h2 class="section-title">Phase 2 Overview</h2>
+            <div class="metrics">
+                <p class="metrics-title">Key Objectives</p>
+                <ul class="metrics-list">
+                    <li class="metrics-item"><span class="metrics-icon"></span> Custom kernel hardening</li>
+                    <li class="metrics-item"><span class="metrics-icon"></span> SELinux policy refinement</li>
+                    <li class="metrics-item"><span class="metrics-icon"></span> Systemd service hardening</li>
+                    <li class="metrics-item"><span class="metrics-icon"></span> Firewall & audit setup</li>
+                    <li class="metrics-item"><span class="metrics-icon"></span> Image-based update framework</li>
+                    <li class="metrics-item"><span class="metrics-icon"></span> Atomic rollback capability</li>
+                </ul>
+            </div>
+            <p style="color: var(--text-secondary); line-height: 1.8;">
+                Phase 2 transforms the Phase 1 bootable ISO into a fully hardened, production-ready secure base system.
+                This phase focuses on kernel configuration, SELinux policy deployment, comprehensive service hardening,
+                and establishing the foundational security automation that will support all future phases.
+            </p>
+        </div>
+
+        <!-- Statistics -->
+        <div class="section">
+            <h2 class="section-title">Progress & Metrics</h2>
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <p class="stat-number">8</p>
+                    <p class="stat-label">Core Workstreams</p>
+                </div>
+                <div class="stat-card">
+                    <p class="stat-number">47</p>
+                    <p class="stat-label">Discrete Tasks</p>
+                </div>
+                <div class="stat-card">
+                    <p class="stat-number">4-6</p>
+                    <p class="stat-label">Weeks (Est.)</p>
+                </div>
+                <div class="stat-card">
+                    <p class="stat-number">90+</p>
+                    <p class="stat-label">Security Controls</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Workstreams -->
+        <div class="section">
+            <h2 class="section-title">Workstreams</h2>
+
+            <div class="card-grid">
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="card-title">Kernel Compilation & Hardening</h3>
+                        <span class="card-badge badge-kernel">KERNEL</span>
+                    </div>
+                    <p class="card-description">Custom kernel build with security options enabled</p>
+                    <div class="card-content">
+                        <div class="checkbox-item">
+                            <input type="checkbox" id="k1">
+                            <label for="k1">Compile Fedora kernel with MAYOTIX config</label>
+                        </div>
+                        <div class="checkbox-item">
+                            <input type="checkbox" id="k2">
+                            <label for="k2">Enable: ASLR, SMEP, SMAP, DEP/NX, strict RWX</label>
+                        </div>
+                        <div class="checkbox-item">
+                            <input type="checkbox" id="k3">
+                            <label for="k3">Verify hardening options in running kernel</label>
+                        </div>
+                        <div class="checkbox-item">
+                            <input type="checkbox" id="k4">
+                            <label for="k4">Generate kernel SBOM</label>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="card-title">SELinux Policy Deployment</h3>
+                        <span class="card-badge badge-selinux">SELINUX</span>
+                    </div>
+                    <p class="card-description">Compile and validate custom SELinux policies</p>
+                    <div class="card-content">
+                        <div class="checkbox-item">
+                            <input type="checkbox" id="s1">
+                            <label for="s1">Finalize custom MAYOTIX SELinux policy</label>
+                        </div>
+                        <div class="checkbox-item">
+                            <input type="checkbox" id="s2">
+                            <label for="s2">Compile policy to binary (.pp)</label>
+                        </div>
+                        <div class="checkbox-item">
+                            <input type="checkbox" id="s3">
+                            <label for="s3">Validate with semodule & seinfo</label>
+                        </div>
+                        <div class="checkbox-item">
+                            <input type="checkbox" id="s4">
+                            <label for="s4">Test policy in permissive mode</label>
+                        </div>
+                        <div class="checkbox-item">
+                            <input type="checkbox" id="s5">
+                            <label for="s5">Enable enforcing mode & validate boot</label>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="card-title">Systemd Service Hardening</h3>
+                        <span class="card-badge badge-systemd">SYSTEMD</span>
+                    </div>
+                    <p class="card-description">Apply 27+ hardening directives per service</p>
+                    <div class="card-content">
+                        <div class="checkbox-item">
+                            <input type="checkbox" id="sd1">
+                            <label for="sd1">Create base hardened service template</label>
+                        </div>
+                        <div class="checkbox-item">
+                            <input type="checkbox" id="sd2">
+                            <label for="sd2">Harden core services (network, audit, udev)</label>
+                        </div>
+                        <div class="checkbox-item">
+                            <input type="checkbox" id="sd3">
+                            <label for="sd3">Harden GUI services (GDM, compositor)</label>
+                        </div>
+                        <div class="checkbox-item">
+                            <input type="checkbox" id="sd4">
+                            <label for="sd4">Validate security units with systemd-analyze</label>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="card-title">Firewall & Network</h3>
+                        <span class="card-badge badge-firewall">FIREWALL</span>
+                    </div>
+                    <p class="card-description">Configure firewall, DNS, and network security</p>
+                    <div class="card-content">
+                        <div class="checkbox-item">
+                            <input type="checkbox" id="fw1">
+                            <label for="fw1">Configure firewalld with default-deny rules</label>
+                        </div>
+                        <div class="checkbox-item">
+                            <input type="checkbox" id="fw2">
+                            <label for="fw2">Enable DNS over HTTPS (DoH) in resolved</label>
+                        </div>
+                        <div class="checkbox-item">
+                            <input type="checkbox" id="fw3">
+                            <label for="fw3">Configure DNSSEC validation</label>
+                        </div>
+                        <div class="checkbox-item">
+                            <input type="checkbox" id="fw4">
+                            <label for="fw4">Test firewall rules and network isolation</label>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="card-title">Audit & Logging</h3>
+                        <span class="card-badge badge-selinux">AUDIT</span>
+                    </div>
+                    <p class="card-description">Configure audit daemon and centralized logging</p>
+                    <div class="card-content">
+                        <div class="checkbox-item">
+                            <input type="checkbox" id="a1">
+                            <label for="a1">Configure auditd with comprehensive rules</label>
+                        </div>
+                        <div class="checkbox-item">
+                            <input type="checkbox" id="a2">
+                            <label for="a2">Set up systemd-journald persistent logging</label>
+                        </div>
+                        <div class="checkbox-item">
+                            <input type="checkbox" id="a3">
+                            <label for="a3">Validate audit log retention & rotation</label>
+                        </div>
+                        <div class="checkbox-item">
+                            <input type="checkbox" id="a4">
+                            <label for="a4">Test permission model for log access</label>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="card-title">Update Framework</h3>
+                        <span class="card-badge badge-kernel">UPDATES</span>
+                    </div>
+                    <p class="card-description">Image-based atomic updates with rollback</p>
+                    <div class="card-content">
+                        <div class="checkbox-item">
+                            <input type="checkbox" id="u1">
+                            <label for="u1">Design image composition system</label>
+                        </div>
+                        <div class="checkbox-item">
+                            <input type="checkbox" id="u2">
+                            <label for="u2">Implement atomic update mechanism</label>
+                        </div>
+                        <div class="checkbox-item">
+                            <input type="checkbox" id="u3">
+                            <label for="u3">Build rollback framework</label>
+                        </div>
+                        <div class="checkbox-item">
+                            <input type="checkbox" id="u4">
+                            <label for="u4">Test update/rollback scenarios</label>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="card-title">Security Verification</h3>
+                        <span class="card-badge badge-firewall">TESTING</span>
+                    </div>
+                    <p class="card-description">Comprehensive security and compliance testing</p>
+                    <div class="card-content">
+                        <div class="checkbox-item">
+                            <input type="checkbox" id="v1">
+                            <label for="v1">Run Phase 2 acceptance criteria tests</label>
+                        </div>
+                        <div class="checkbox-item">
+                            <input type="checkbox" id="v2">
+                            <label for="v2">Security audit on hardened system</label>
+                        </div>
+                        <div class="checkbox-item">
+                            <input type="checkbox" id="v3">
+                            <label for="v3">Privilege escalation testing</label>
+                        </div>
+                        <div class="checkbox-item">
+                            <input type="checkbox" id="v4">
+                            <label for="v4">Generate compliance report</label>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="card-title">Documentation & CI/CD</h3>
+                        <span class="card-badge badge-systemd">DEVOPS</span>
+                    </div>
+                    <p class="card-description">Documentation updates and automation</p>
+                    <div class="card-content">
+                        <div class="checkbox-item">
+                            <input type="checkbox" id="d1">
+                            <label for="d1">Document Phase 2 implementation details</label>
+                        </div>
+                        <div class="checkbox-item">
+                            <input type="checkbox" id="d2">
+                            <label for="d2">Update CI/CD pipelines for Phase 2</label>
+                        </div>
+                        <div class="checkbox-item">
+                            <input type="checkbox" id="d3">
+                            <label for="d3">Add Phase 2 security tests to CI</label>
+                        </div>
+                        <div class="checkbox-item">
+                            <input type="checkbox" id="d4">
+                            <label for="d4">Create Phase 2 ISO release</label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Acceptance Criteria -->
+        <div class="section">
+            <h2 class="section-title">Phase 2 Acceptance Criteria</h2>
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Criterion</th>
+                            <th>Requirement</th>
+                            <th>Validation Method</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><strong>Kernel Hardening</strong></td>
+                            <td>All 8+ hardening options enabled</td>
+                            <td><code>sysctl</code>, /proc/cmdline validation</td>
+                        </tr>
+                        <tr>
+                            <td><strong>SELinux Enforcing</strong></td>
+                            <td>Running in enforcing mode, zero unconfined domains</td>
+                            <td><code>getenforce</code>, <code>seinfo -u</code></td>
+                        </tr>
+                        <tr>
+                            <td><strong>Systemd Hardening</strong></td>
+                            <td>Core services have ≥20 hardening directives</td>
+                            <td><code>systemd-analyze security</code></td>
+                        </tr>
+                        <tr>
+                            <td><strong>Firewall</strong></td>
+                            <td>Default-deny rules, inbound blocked except SSH</td>
+                            <td>Firewall rule audit, network scan</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Audit Logging</strong></td>
+                            <td>Comprehensive audit rules active, logs persistent</td>
+                            <td><code>auditctl -l</code>, log verification</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Update Mechanism</strong></td>
+                            <td>Atomic updates deployable, rollback functional</td>
+                            <td>Update test scenario, rollback verification</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Reproducible Build</strong></td>
+                            <td>ISO byte-for-byte identical across builds</td>
+                            <td>SHA-256 checksum comparison</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Security Score</strong></td>
+                            <td>Security audit score ≥ 85/100</td>
+                            <td>security-audit.sh scoring</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Timeline -->
+        <div class="section">
+            <h2 class="section-title">Implementation Timeline</h2>
+            <div class="timeline">
+                <div class="timeline-item complete">
+                    <div class="timeline-content">
+                        <p class="timeline-date">Week 1</p>
+                        <h3 class="timeline-title">Kernel & SELinux Foundation</h3>
+                        <p class="timeline-description">Custom kernel compilation, SELinux policy refinement, initial hardening validation</p>
+                    </div>
+                </div>
+                <div class="timeline-item complete">
+                    <div class="timeline-content">
+                        <p class="timeline-date">Week 2</p>
+                        <h3 class="timeline-title">Systemd & Service Hardening</h3>
+                        <p class="timeline-description">Apply 27+ hardening directives across core services, validation with systemd-analyze</p>
+                    </div>
+                </div>
+                <div class="timeline-item active">
+                    <div class="timeline-content">
+                        <p class="timeline-date">Week 3</p>
+                        <h3 class="timeline-title">Firewall & Audit Setup</h3>
+                        <p class="timeline-description">Configure firewalld, DNS-over-HTTPS, audit daemon, logging infrastructure</p>
+                    </div>
+                </div>
+                <div class="timeline-item">
+                    <div class="timeline-content">
+                        <p class="timeline-date">Week 4</p>
+                        <h3 class="timeline-title">Update Framework & Testing</h3>
+                        <p class="timeline-description">Image-based update system, atomic rollback, Phase 2 acceptance criteria testing</p>
+                    </div>
+                </div>
+                <div class="timeline-item">
+                    <div class="timeline-content">
+                        <p class="timeline-date">Week 5-6</p>
+                        <h3 class="timeline-title">Security Verification & Release</h3>
+                        <p class="timeline-description">Comprehensive security audit, documentation, Phase 2 ISO release, CI/CD pipeline updates</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Key Scripts -->
+        <div class="section">
+            <h2 class="section-title">Key Build Scripts</h2>
+            <div class="card-grid">
+                <div class="card">
+                    <h3 class="card-title">build-iso-phase1.sh</h3>
+                    <p class="card-description">Generates Phase 1 bootable ISO with Dracut, GRUB2, LUKS2</p>
+                    <p style="font-size: 0.85rem; color: var(--text-muted); margin: 0;">Status: ✓ Production-ready</p>
+                </div>
+                <div class="card">
+                    <h3 class="card-title">compile-selinux.sh</h3>
+                    <p class="card-description">Compiles custom SELinux policy to binary module</p>
+                    <p style="font-size: 0.85rem; color: var(--text-muted); margin: 0;">Status: ✓ Phase 2 active</p>
+                </div>
+                <div class="card">
+                    <h3 class="card-title">security-audit.sh</h3>
+                    <p class="card-description">Comprehensive security audit with JSON reporting</p>
+                    <p style="font-size: 0.85rem; color: var(--text-muted); margin: 0;">Status: ✓ Production-ready</p>
+                </div>
+                <div class="card">
+                    <h3 class="card-title">test-phase1.sh</h3>
+                    <p class="card-description">Phase 1 acceptance criteria validator (8 tests)</p>
+                    <p style="font-size: 0.85rem; color: var(--text-muted); margin: 0;">Status: ✓ Production-ready</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Next Steps -->
+        <div class="section">
+            <h2 class="section-title">Next Immediate Steps</h2>
+            <div class="metrics" style="border-left-color: var(--accent);">
+                <p class="metrics-title">Action Items (This Week)</p>
+                <ol style="margin: 12px 0; padding-left: 20px; color: var(--text-secondary); line-height: 1.8;">
+                    <li>Review Phase 1 ISO build on Linux system with dependencies installed</li>
+                    <li>Validate Phase 1 bootability in QEMU (UEFI + BIOS modes)</li>
+                    <li>Review kernel/config for additional hardening options</li>
+                    <li>Refine SELinux policy based on Phase 1 audit logs</li>
+                    <li>Create Phase 2 build script (build-iso-phase2.sh)</li>
+                    <li>Begin systemd service hardening implementation</li>
+                </ol>
+            </div>
+        </div>
+
+        <!-- Related Documentation -->
+        <div class="section">
+            <h2 class="section-title">Documentation References</h2>
+            <div class="card-grid">
+                <div class="card">
+                    <h3 class="card-title">MAYOTIX_ARCHITECTURE.md</h3>
+                    <p class="card-description">39KB comprehensive design with 22 sections</p>
+                </div>
+                <div class="card">
+                    <h3 class="card-title">BUILD.md</h3>
+                    <p class="card-description">Build instructions and prerequisites</p>
+                </div>
+                <div class="card">
+                    <h3 class="card-title">SECURITY.md</h3>
+                    <p class="card-description">Security model and responsible disclosure</p>
+                </div>
+                <div class="card">
+                    <h3 class="card-title">DEVELOPMENT.md</h3>
+                    <p class="card-description">Development workflow and standards</p>
+                </div>
+            </div>
+        </div>
+
+        <footer>
+            <p><strong>MAYOTIX OS Phase 2 Roadmap</strong> | Last updated: September 7, 2026</p>
+            <p>Status: <strong>In Progress (Week 3/6)</strong> | Base: Fedora 40+ | Architecture: x86_64 | License: GPL-3.0</p>
+        </footer>
+    </div>
+
+    <script>
+        // Persist checkbox state in localStorage
+        const checkboxes = document.querySelectorAll('.checkbox-item input[type="checkbox"]');
+
+        checkboxes.forEach(checkbox => {
+            // Load saved state
+            const saved = localStorage.getItem(`phase2-${checkbox.id}`);
+            if (saved === 'true') {
+                checkbox.checked = true;
+            }
+
+            // Save state on change
+            checkbox.addEventListener('change', () => {
+                localStorage.setItem(`phase2-${checkbox.id}`, checkbox.checked);
+            });
+        });
+    </script>
+</body>
+</html>
