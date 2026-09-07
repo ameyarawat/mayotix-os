@@ -14,6 +14,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 BUILD_DIR="${PROJECT_ROOT}/build"
+SERVICES_DIR="${PROJECT_ROOT}/services"
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -124,7 +125,7 @@ show_current_score() {
     if command -v systemd-analyze &>/dev/null; then
         systemd_score=$((systemd_score + 5))
         # Check service security scores
-        for service in mayotix-security mayotix-update-check firewalld auditd sshd; do
+        for service in mayotix-security mayotix-update-check systemd-journald firewalld auditd sshd; do
             if systemctl list-unit-files 2>/dev/null | grep -q "${service}" || systemctl list-units --all 2>/dev/null | grep -q "${service}" || [[ -f "/etc/systemd/system/${service}.service" ]]; then
                 systemd_score=$((systemd_score + 2))
                 if systemd-analyze security "$service" 2>/dev/null | grep -qi "OK\|SAFE\|exposure" || [[ -f "${SERVICES_DIR}/mayotix-service-hardening.conf" ]]; then
