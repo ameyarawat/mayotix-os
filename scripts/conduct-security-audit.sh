@@ -124,7 +124,7 @@ show_current_score() {
     if command -v systemd-analyze &>/dev/null; then
         systemd_score=$((systemd_score + 5))
         # Check service security scores
-        for service in mayotix-security mayotix-update-check sshd; do
+        for service in mayotix-security mayotix-update-check firewalld auditd sshd; do
             if systemctl list-unit-files 2>/dev/null | grep -q "${service}" || systemctl list-units --all 2>/dev/null | grep -q "${service}" || [[ -f "/etc/systemd/system/${service}.service" ]]; then
                 systemd_score=$((systemd_score + 2))
                 if systemd-analyze security "$service" 2>/dev/null | grep -qi "OK\|SAFE\|exposure" || [[ -f "${SERVICES_DIR}/mayotix-service-hardening.conf" ]]; then
