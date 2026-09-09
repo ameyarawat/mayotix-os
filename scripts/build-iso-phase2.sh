@@ -142,25 +142,16 @@ build_iso() {
 
     mkdir -p "$BUILD_DIR"
 
-    # This would call the actual build-iso-phase1.sh with Phase 2 configuration
-    # For now, log the intended steps
+    export ISO_NAME="mayotix-os-2.0-alpha-x86_64.iso"
+    local build_args=()
+    if [[ $REPRODUCIBLE -eq 1 ]]; then
+        build_args+=(--reproducible)
+    fi
 
-    echo ""
-    log_info "Phase 2 ISO build steps:"
-    echo "  1. Prepare root filesystem with Phase 2 configuration"
-    echo "  2. Compile SELinux policy"
-    echo "  3. Configure systemd service hardening"
-    echo "  4. Set up firewall rules"
-    echo "  5. Configure audit daemon"
-    echo "  6. Create EFI boot partition"
-    echo "  7. Install bootloader (GRUB2 + Shim)"
-    echo "  8. Generate ISO image"
-    echo "  9. Sign ISO with GPG"
-    echo "  10. Generate checksums"
-    echo ""
+    log_info "Invoking ISO build engine for Phase 2: $ISO_NAME"
+    bash "${PROJECT_ROOT}/scripts/build-iso-phase1.sh" "${build_args[@]}"
 
-    # In production, this would execute the actual build
-    log_success "ISO build steps prepared"
+    log_success "Phase 2 ISO successfully created: ${BUILD_DIR}/${ISO_NAME}"
 }
 
 # Generate checksums

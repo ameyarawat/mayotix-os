@@ -297,7 +297,7 @@ create_efi_image() {
 create_iso_filesystem() {
     log_info "Creating ISO filesystem..."
 
-    local iso_path="${BUILD_DIR}/mayotix-os-1.0-alpha-x86_64.iso"
+    local iso_path="${BUILD_DIR}/${ISO_NAME:-mayotix-os-1.0-alpha-x86_64.iso}"
 
     # Find syslinux MBR binary (path differs between distros)
     local isohdpfx=""
@@ -401,7 +401,7 @@ main() {
     create_efi_image
 
     # Create ISO
-    local iso_path="${BUILD_DIR}/mayotix-os-1.0-alpha-x86_64.iso"
+    local iso_path="${BUILD_DIR}/${ISO_NAME:-mayotix-os-1.0-alpha-x86_64.iso}"
     create_iso_filesystem
 
     # Generate verification files
