@@ -1,0 +1,50 @@
+module mayotix_desktop 1.0;
+
+require {
+    type unconfined_t;
+    type xdm_t;
+    type tmp_t;
+    type var_t;
+    type user_home_t;
+    type bin_t;
+    type etc_t;
+    type usr_t;
+    class process { setexec signal transition };
+    class file { read write open execute execute_no_trans getattr };
+    class dir { search add_name remove_name read write open getattr };
+    class sock_file { write getattr create unlink };
+    class unix_stream_socket { connectto create bind listen accept };
+    class capability { sys_tty_config setuid setgid net_bind_service };
+}
+
+# Define the compositor domain
+type mayotix_compositor_t;
+type mayotix_compositor_exec_t;
+
+# Process and capabilities
+allow mayotix_compositor_t self:process { setexec signal transition };
+allow mayotix_compositor_t self:capability { sys_tty_config setuid setgid net_bind_service };
+
+# Binary and system execution
+allow mayotix_compositor_t bin_t:file { read open execute execute_no_trans getattr };
+allow mayotix_compositor_t etc_t:file { read open getattr };
+allow mayotix_compositor_t usr_t:file { read open execute getattr };
+
+# Temporary and runtime data
+allow mayotix_compositor_t tmp_t:dir { search add_name remove_name read write open getattr };
+allow mayotix_compositor_t tmp_t:file { read write open create unlink getattr };
+allow mayotix_compositor_t var_t:dir { search getattr };
+allow mayotix_compositor_t var_t:file { read open getattr };
+
+# User home access (read config)
+allow mayotix_compositor_t user_home_t:dir { search getattr };
+allow mayotix_compositor_t user_home_t:file { read open getattr };
+
+# IPC and Wayland display sockets
+allow mayotix_compositor_t self:unix_stream_socket { connectto create bind listen accept };
+allow mayotix_compositor_t self:sock_file { write getattr create unlink };
+
+# Display manager transition
+type_transition xdm_t mayotix_compositor_exec_t:process mayotix_compositor_t;
+allow xdm_t mayotix_compositor_exec_t:file { entrypoint read getattr };
+allow xdm_t mayotix_compositor_t:process { transition };

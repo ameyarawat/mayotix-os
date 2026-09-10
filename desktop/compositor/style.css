@@ -1,0 +1,80 @@
+/* MAYOTIX OS Phase 3 Week 1: Waybar Style */
+* {
+    font-family: "JetBrains Mono", monospace;
+    font-size: 10px;
+}
+
+/* Colors */
+#define background #1e1e1e
+#define foreground #e0e0e0
+#define border #444444
+#define focused #0099ff
+#define urgent #ff3b30
+#define inactive #8a8a8a
+
+/* Window */
+window {
+    background-color: alpha(background, 0.9);
+    color: foreground;
+    border-width: 1px;
+    border-style: solid;
+    border-color: border;
+}
+
+/* Modules */
+#workspaces button {
+    padding: 0 5px;
+    margin: 0 3px;
+    color: foreground;
+    background-color: transparent;
+    border-radius: 0;
+}
+
+#workspaces button.focused {
+    background-color: focused;
+    color: #1e1e1e;
+}
+
+#workspaces button.active {
+    background-color: border;
+    color: foreground;
+}
+
+#workspaces button.urgent {
+    background-color: urgent;
+    color: #1e1e1e;
+}
+
+#custom-selinux, #custom-firewall, #custom-updates {
+    padding: 0 8px;
+    margin: 0 3px;
+    color: foreground;
+    background-color: alpha(background, 0.8);
+}
+
+#clock {
+    padding: 0 8px;
+    margin: 0 3px;
+    color: foreground;
+}
+
+#tray {
+    padding: 0 4px;
+    margin: 0 3px;
+}
+
+#idle_inhibitor {
+    padding: 0 5px;
+    margin: 0 3px;
+}
+
+/* Hover effects */
+#workspaces button:hover,
+#custom-selinux:hover,
+#custom-firewall:hover,
+#custom-updates:hover,
+#clock:hover,
+#tray:hover,
+#idle_inhibitor:hover {
+    background-color: alpha(foreground, 0.1);
+}
