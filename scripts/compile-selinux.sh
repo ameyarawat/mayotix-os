@@ -84,17 +84,21 @@ compile_policy() {
     log_info "Compiling: $base_name"
 
     # Compile .te to .mod
-    if checkmodule -M -m "$te_file" -o "${BUILD_DIR}/${base_name}.mod" &>/dev/null; then
+    local compile_out
+    if compile_out=$(checkmodule -M -m "$te_file" -o "${BUILD_DIR}/${base_name}.mod" 2>&1); then
         log_success "$base_name compiled to .mod"
     else
+        echo -e "${RED}${compile_out}${NC}"
         log_error "Failed to compile $base_name"
     fi
 
     # Package .mod to .pp
-    if semodule_package -o "${BUILD_DIR}/${base_name}.pp" \
-        -m "${BUILD_DIR}/${base_name}.mod" &>/dev/null; then
+    local pkg_out
+    if pkg_out=$(semodule_package -o "${BUILD_DIR}/${base_name}.pp" \
+        -m "${BUILD_DIR}/${base_name}.mod" 2>&1); then
         log_success "$base_name packaged to .pp"
     else
+        echo -e "${RED}${pkg_out}${NC}"
         log_error "Failed to package $base_name"
     fi
 
