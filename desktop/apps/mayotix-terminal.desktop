@@ -1,0 +1,9 @@
+[Desktop Entry]
+Name=Terminal (Sandboxed)
+Comment=Use the terminal in a sandboxed environment
+Exec=mayotix-bwrap --profile network-isolated -- /usr/bin/alacritty
+Icon=utilities-terminal
+Terminal=false
+Type=Application
+Categories=System;Terminal;
+StartupNotify=true

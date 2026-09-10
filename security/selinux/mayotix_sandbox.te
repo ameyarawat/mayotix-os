@@ -1,0 +1,64 @@
+module mayotix_sandbox 1.0;
+
+require {
+    type unconfined_t;
+    type xdm_t;
+    type tmp_t;
+    type var_t;
+    type home_root_t;
+    type user_home_t;
+    type bin_t;
+    type lib_t;
+    type etc_t;
+    class unix_stream_socket { connectto create bind listen accept };
+    class sock_file { write getattr create unlink };
+    class file { create read write open execute execute_no_trans unlink link rename getattr entrypoint };
+    class dir { search open read write add_name remove_name getattr };
+    class process { transition siginh rlimitinh noatsecure signal };
+    class capability { net_bind_service net_raw sys_chroot setuid setgid };
+}
+
+# Define the sandbox domain
+type mayotix_sandbox_t;
+type mayotix_sandbox_exec_t;
+
+# Process and entrypoint
+allow mayotix_sandbox_t self:process { signal };
+allow mayotix_sandbox_t mayotix_sandbox_exec_t:file { entrypoint read open execute getattr };
+
+# Allow transitions from login / shell domains
+type_transition xdm_t mayotix_sandbox_exec_t:process mayotix_sandbox_t;
+allow xdm_t mayotix_sandbox_t:process { transition siginh rlimitinh noatsecure };
+allow xdm_t mayotix_sandbox_exec_t:file { read open execute getattr };
+
+type_transition unconfined_t mayotix_sandbox_exec_t:process mayotix_sandbox_t;
+allow unconfined_t mayotix_sandbox_t:process { transition siginh rlimitinh noatsecure };
+allow unconfined_t mayotix_sandbox_exec_t:file { read open execute getattr };
+
+# System binaries and libraries execution
+allow mayotix_sandbox_t bin_t:file { read open execute execute_no_trans getattr };
+allow mayotix_sandbox_t lib_t:file { read open execute getattr };
+
+# Config reading
+allow mayotix_sandbox_t etc_t:file { read open getattr };
+allow mayotix_sandbox_t etc_t:dir { search open getattr };
+
+# Ephemeral / temporary data
+allow mayotix_sandbox_t tmp_t:file { create read write open unlink getattr };
+allow mayotix_sandbox_t tmp_t:dir { search open read write add_name remove_name getattr };
+
+# Variable / cache data
+allow mayotix_sandbox_t var_t:file { create read write open unlink getattr };
+allow mayotix_sandbox_t var_t:dir { search open read write add_name remove_name getattr };
+
+# Restricted user home access
+allow mayotix_sandbox_t user_home_t:dir { search open getattr };
+allow mayotix_sandbox_t home_root_t:dir { search open getattr };
+allow mayotix_sandbox_t user_home_t:file { read open getattr };
+
+# Sockets and IPC
+allow mayotix_sandbox_t self:unix_stream_socket { connectto create bind listen accept };
+allow mayotix_sandbox_t self:sock_file { write getattr create unlink };
+
+# Sandboxing capabilities
+allow mayotix_sandbox_t self:capability { net_bind_service net_raw sys_chroot setuid setgid };

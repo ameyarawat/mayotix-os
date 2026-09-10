@@ -1,0 +1,38 @@
+# MAYOTIX OS Phase 3 Week 2: Bubblewrap Profile for Minimal-Net CLI Tools
+# This profile is for tools that need minimal network access (e.g., for updates or licensing checks).
+# It uses a private network namespace but does not allow arbitrary network access by default.
+# Additional capabilities might be needed for network operations.
+
+# Set network to private (creates a new network namespace)
+NETWORK="private"
+
+# For minimal network, we might need to keep certain capabilities.
+# Common capabilities for network tools:
+#   CAP_NET_BIND_SERVICE (to bind to privileged ports <1024)
+#   CAP_NET_RAW (for raw sockets, e.g., ping)
+#   CAP_NET_ADMIN (for network administration, e.g., setting up interfaces)
+# We'll leave it to the user to specify via --cap if needed, or we can set a default.
+# For safety, we start with dropping all and let the profile optionally add back.
+# We'll set CAPABILITIES to an empty string to rely on the script's default (drop all).
+# However, if we want to allow binding to privileged ports, we need CAP_NET_BIND_SERVICE.
+# Let's make it configurable: if the user wants to bind to low ports, they can pass --cap CAP_NET_BIND_SERVICE.
+# So we do not set CAPABILITIES here, leaving it to the command line.
+
+# Note: The script already sets up a minimal read-only root, private /tmp, and isolated /home.
+# This profile just ensures we have a private network namespace (which is already more isolated than host).
+# The network namespace is private, meaning the sandbox has its own network stack, but without any capabilities,
+# it cannot create network interfaces or bind to ports. So it's essentially isolated unless we add capabilities.
+# For a tool that just needs to make outgoing connections (e.g., curl), we might need CAP_NET_RAW? Actually,
+# for TCP/UDP connections, no special capabilities are needed beyond being able to create sockets.
+# However, to create a socket, we need no special capability. So we can leave capabilities dropped.
+# But note: without CAP_NET_BIND_SERVICE, we cannot bind to ports <1024, which is fine for outgoing connections.
+# So we can keep the default (drop all) for minimal-net as well.
+
+# If we want to allow the sandbox to use the host's network (but still isolated via network namespace?),
+# we would set NETWORK="host". But that defeats the purpose of isolation. So we stick with private.
+
+# We can also consider mounting /etc/resolv.conf from the host for DNS.
+# We'll do that in the script? Actually, we already mount /etc as read-only, which includes resolv.conf.
+# That should be sufficient.
+
+# End of profile

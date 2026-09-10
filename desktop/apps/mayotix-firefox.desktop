@@ -1,0 +1,11 @@
+[Desktop Entry]
+Name=Firefox (Sandboxed)
+Comment=Browse the World Wide Web in a sandboxed environment
+Exec=flatpak run --env=MOZ_ENABLE_WAYLAND=1 org.mozilla.firefox
+Icon=firefox
+Terminal=false
+Type=Application
+Categories=Network;WebBrowser;
+StartupNotify=true
+StartupWMClass=Firefox
+# X-Flatpak-RenamedFrom=org.mozilla.firefox

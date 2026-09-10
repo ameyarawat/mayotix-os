@@ -1,0 +1,19 @@
+# MAYOTIX OS Phase 3 Week 2: Bubblewrap Profile for Network-Isolated CLI Tools
+# This profile is for offline tools that do not require network access.
+# It sets up a sandbox with no network namespace (unshare-net) and no network access.
+
+# We source this file in mayotix-bwrap.sh, so we set variables that will be used.
+
+# Override the network option to 'none' (which is the default, but we make it explicit)
+NETWORK="none"
+
+# Optionally, we can also drop more capabilities or adjust mounts.
+# For network-isolated, we might want to drop even more, but the default in mayotix-bwrap.sh is to drop all capabilities.
+# We can leave it as is, or explicitly set to drop all (already done by --cap-all if CAPABILITIES is not set).
+
+# If we want to allow only specific capabilities, we can set CAPABILITIES here.
+# For a completely isolated offline tool, we might not need any capabilities.
+# So we leave CAPABILITIES unset to drop all.
+
+# Note: The script already sets up a minimal read-only root, private /tmp, and isolated /home.
+# This profile just ensures network is isolated.
