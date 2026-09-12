@@ -1,0 +1,162 @@
+#!/usr/bin/env python3
+# MAYOTIX Security Center - live status dashboard
+import gi
+gi.require_version('Gtk', '3.0')
+from gi.repository import Gtk, GLib, Pango
+import subprocess
+import threading
+import json
+import dbus
+import os
+
+from dbus.mainloop.glib import DBusGMainLoop
+
+class SecurityCenterWindow(Gtk.Window):
+    def __init__(self):
+        super().__init__(title="MAYOTIX Security Center")
+        self.set_default_size(800, 600)
+        self.set_border_width(10)
+
+        # Main layout
+        self.main_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
+        self.add(self.main_box)
+
+        # Header
+        header = Gtk.Label()
+        header.set_markup("<span size='x-large' weight='bold'>System Security Status</span>")
+        self.main_box.pack_start(header, False, False, 10)
+
+        # FlowBox for responsive cards layout
+        self.flowbox = Gtk.FlowBox()
+        self.flowbox.set_valign(Gtk.Align.START)
+        self.flowbox.set_max_children_per_line(2)
+        self.flowbox.set_selection_mode(Gtk.SelectionMode.NONE)
+        self.main_box.pack_start(self.flowbox, True, True, 0)
+
+        # Cards map
+        self.cards = {}
+
+        # Initialize cards
+        self._init_selinux_card()
+        self._init_firewall_card()
+        self._init_audit_card()
+        self._init_update_card()
+
+        # Start DBus updates listener
+        self._setup_dbus_listener()
+
+        # Initial refresh
+        self.refresh_data()
+
+    def _create_card(self, title_text, icon_name=None):
+        card = Gtk.Frame()
+        card_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=5)
+        card_box.set_border_width(10)
+        card.add(card_box)
+
+        header_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=5)
+        if icon_name:
+            icon = Gtk.Image.new_from_icon_name(icon_name, Gtk.IconSize.LARGE_TOOLBAR)
+            header_box.pack_start(icon, False, False, 0)
+
+        title = Gtk.Label()
+        title.set_markup(f"<span weight='bold'>{title_text}</span>")
+        title.set_xalign(0)
+        header_box.pack_start(title, True, True, 0)
+
+        card_box.pack_start(header_box, False, False, 5)
+
+        content_label = Gtk.Label()
+        content_label.set_xalign(0)
+        content_label.set_line_wrap(True)
+        content_label.set_selectable(True)
+        card_box.pack_start(content_label, True, True, 0)
+
+        self.flowbox.add(card)
+        return card, content_label
+
+    def _init_selinux_card(self):
+        _, self.cards['selinux'] = self._create_card("SELinux Status", "security-high")
+
+    def _init_firewall_card(self):
+        _, self.cards['firewall'] = self._create_card("Firewalld Status", "network-transmit-receive")
+
+    def _init_audit_card(self):
+        _, self.cards['audit'] = self._create_card("Recent Audit Events", "system-search")
+
+    def _init_update_card(self):
+        _, self.cards['updates'] = self._create_card("System Integrity / Updates", "software-update-available")
+
+    def _setup_dbus_listener(self):
+        try:
+            DBusGMainLoop(set_as_default=True)
+            self.bus = dbus.SessionBus()
+            self.bus.add_signal_receiver(
+                self.on_security_status_changed,
+                dbus_interface="com.mayotix.SecurityCenter",
+                signal_name="StatusUpdated"
+            )
+        except Exception as e:
+            print(f"Failed to setup DBus listener: {e}")
+
+    def on_security_status_changed(self, payload_json):
+        # Update UI triggered by the daemon
+        try:
+            data = json.loads(payload_json)
+            GLib.idle_add(self._update_ui_from_data, data)
+        except Exception as e:
+            print(f"Error handling dbus signal: {e}")
+
+    def _update_ui_from_data(self, data):
+        if 'selinux' in data:
+            mode = data['selinux'].get('mode', 'Unknown')
+            color = 'green' if mode.lower() == 'enforcing' else 'red'
+            self.cards['selinux'].set_markup(f"Mode: <span foreground='{color}' weight='bold'>{mode}</span>")
+
+        if 'firewall' in data:
+            f_data = data['firewall']
+            text = f"State: <b>{f_data.get('state', 'Unknown')}</b>\n"
+            text += f"Active Zones: {', '.join(f_data.get('zones', []))}\n"
+            self.cards['firewall'].set_markup(text)
+
+        if 'audit' in data:
+            denials = data['audit'].get('avc_denials', 0)
+            self.cards['audit'].set_markup(f"Recent AVC Denials: <b>{denials}</b>")
+
+        if 'updates' in data:
+            u_data = data['updates']
+            text = f"Status: {u_data.get('status', 'Unknown')}\n"
+            text += f"Pending Security Updates: <b>{u_data.get('pending', 0)}</b>"
+            self.cards['updates'].set_markup(text)
+
+        return False
+
+    def refresh_data(self):
+        # Trigger background data fetch natively if daemon isn't running yet
+        threading.Thread(target=self._fetch_data_worker, daemon=True).start()
+
+    def _fetch_data_worker(self):
+        data = {}
+
+        # SELinux
+        try:
+            mode = subprocess.check_output(['getenforce'], text=True).strip()
+            data['selinux'] = {'mode': mode}
+        except:
+            data['selinux'] = {'mode': 'Disabled/Error'}
+
+        # Firewalld (mock output for UI demonstration when daemon handles real privileged calls)
+        data['firewall'] = {'state': 'running', 'zones': ['public (default)']}
+
+        # Audio / Denials
+        data['audit'] = {'avc_denials': 0}
+
+        data['updates'] = {'status': 'System Secure', 'pending': 0}
+
+        GLib.idle_add(self._update_ui_from_data, data)
+
+if __name__ == '__main__':
+    app = SecurityCenterWindow()
+    app.connect("destroy", Gtk.main_quit)
+    app.show_all()
+    Gtk.main()

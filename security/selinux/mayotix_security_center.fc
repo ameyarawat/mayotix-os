@@ -1,0 +1,2 @@
+# File context definitions for MAYOTIX Security Center
+/usr/bin/mayotix-security-center		--		system_u:object_r:mayotix_security_center_exec_t:s0

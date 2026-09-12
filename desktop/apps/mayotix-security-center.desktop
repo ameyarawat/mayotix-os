@@ -1,0 +1,9 @@
+[Desktop Entry]
+Name=Mayotix Security Center
+Comment=Live dashboard for SELinux, Firewall, and system audit status
+Exec=/usr/bin/mayotix-security-center
+Icon=security-high
+Terminal=false
+Type=Application
+Categories=System;Settings;Security;
+StartupNotify=true

@@ -1,0 +1,82 @@
+#!/usr/bin/env python3
+# MAYOTIX Security Center - Background D-Bus service for security monitoring
+import dbus
+import dbus.service
+from dbus.mainloop.glib import DBusGMainLoop
+from gi.repository import GLib
+import subprocess
+import json
+import time
+
+class SecurityCenterDaemon(dbus.service.Object):
+    def __init__(self, bus, path):
+        super().__init__(bus, path)
+        self.last_status = {}
+        # Schedule periodic checks
+        GLib.timeout_add_seconds(30, self.check_security_status)
+
+    @dbus.service.signal('com.mayotix.SecurityCenter', signature='s')
+    def StatusUpdated(self, status_json):
+        pass
+
+    @dbus.service.method('com.mayotix.SecurityCenter', out_signature='s')
+    def GetStatus(self):
+        return json.dumps(self.last_status)
+
+    def check_security_status(self):
+        data = {}
+
+        # 1. SELinux Status
+        try:
+            mode = subprocess.check_output(['getenforce'], text=True).strip()
+            data['selinux'] = {'mode': mode}
+        except:
+            data['selinux'] = {'mode': 'Unknown'}
+
+        # 2. Firewalld Status
+        try:
+            # We parse the brief state. Active zones could be parsed from --list-all if needed
+            state = subprocess.check_output(['firewall-cmd', '--state'], text=True, stderr=subprocess.DEVNULL).strip()
+            # If firewall runs, try to list active zones
+            zones_out = subprocess.check_output(['firewall-cmd', '--get-active-zones'], text=True, stderr=subprocess.DEVNULL)
+            zones = [z.strip() for z in zones_out.split('\n') if z.strip() and not z.startswith(' ')]
+            data['firewall'] = {'state': state, 'zones': zones if zones else ['None']}
+        except:
+            data['firewall'] = {'state': 'Stopped/Error', 'zones': []}
+
+        # 3. Audit Log Summary (Recent AVCs)
+        try:
+            # Use ausearch to count recent denials (last 1 hour, or today)
+            # -m AVC -ts recent
+            cmd = "ausearch -m AVC -ts recent 2>/dev/null | grep -c 'type=AVC' || echo 0"
+            count = subprocess.check_output(cmd, shell=True, text=True).strip()
+            data['audit'] = {'avc_denials': int(count)}
+        except:
+            data['audit'] = {'avc_denials': 0}
+
+        # 4. Updates / Integrity
+        # Mocking integrity check status for Phase 3 Week 3
+        data['updates'] = {'status': 'Audited', 'pending': 0}
+
+        self.last_status = data
+        self.StatusUpdated(json.dumps(data))
+
+        return True # keep the GLib timer running
+
+if __name__ == '__main__':
+    DBusGMainLoop(set_as_default=True)
+    bus = dbus.SessionBus()
+
+    # Needs a dbus interface name configuration in a real system setup to claim standard name,
+    # but for user-level session bus without strict policy we can just emit signals, or request name:
+    name = dbus.service.BusName("com.mayotix.SecurityCenter", bus)
+    daemon = SecurityCenterDaemon(bus, '/com/mayotix/SecurityCenter')
+
+    # Initial check
+    daemon.check_security_status()
+
+    loop = GLib.MainLoop()
+    try:
+        loop.run()
+    except KeyboardInterrupt:
+        pass

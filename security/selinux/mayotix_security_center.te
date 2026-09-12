@@ -1,0 +1,55 @@
+module mayotix_security_center 1.0;
+
+require {
+    type unconfined_t;
+    type xdm_t;
+    type bin_t;
+    type lib_t;
+    type etc_t;
+    type tmp_t;
+    type var_t;
+    type var_log_t;
+    type auditd_log_t;
+    class unix_stream_socket { connectto create bind listen accept };
+    class sock_file { write getattr create unlink };
+    class file { create read write open execute execute_no_trans unlink link rename getattr entrypoint };
+    class dir { search open read write add_name remove_name getattr };
+    class process { transition siginh rlimitinh noatsecure signal };
+    class capability { net_bind_service net_raw sys_chroot setuid setgid };
+}
+
+# Define the Security Center domain
+type mayotix_security_center_t;
+type mayotix_security_center_exec_t;
+
+# Process and entrypoint
+allow mayotix_security_center_t self:process { signal };
+allow mayotix_security_center_t mayotix_security_center_exec_t:file { entrypoint read open execute getattr };
+
+# Transitions from display manager/user session
+type_transition xdm_t mayotix_security_center_exec_t:process mayotix_security_center_t;
+allow xdm_t mayotix_security_center_t:process { transition siginh rlimitinh noatsecure };
+allow xdm_t mayotix_security_center_exec_t:file { read open execute getattr };
+
+type_transition unconfined_t mayotix_security_center_exec_t:process mayotix_security_center_t;
+allow unconfined_t mayotix_security_center_t:process { transition siginh rlimitinh noatsecure };
+allow unconfined_t mayotix_security_center_exec_t:file { read open execute getattr };
+
+# System execution access
+allow mayotix_security_center_t bin_t:file { read open execute execute_no_trans getattr };
+allow mayotix_security_center_t lib_t:file { read open execute getattr };
+
+# Configuration and audit log reading
+allow mayotix_security_center_t etc_t:file { read open getattr };
+allow mayotix_security_center_t etc_t:dir { search open getattr };
+allow mayotix_security_center_t var_t:dir { search open getattr };
+allow mayotix_security_center_t var_log_t:dir { search open getattr };
+allow mayotix_security_center_t auditd_log_t:file { read open getattr };
+
+# Temporary storage
+allow mayotix_security_center_t tmp_t:file { create read write open unlink getattr };
+allow mayotix_security_center_t tmp_t:dir { search open read write add_name remove_name getattr };
+
+# Sockets for D-Bus / IPC
+allow mayotix_security_center_t self:unix_stream_socket { connectto create bind listen accept };
+allow mayotix_security_center_t self:sock_file { write getattr create unlink };

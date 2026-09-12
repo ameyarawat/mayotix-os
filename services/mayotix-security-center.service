@@ -1,0 +1,35 @@
+[Unit]
+Description=MAYOTIX Security Center Daemon
+After=dbus.socket
+Requires=dbus.socket
+
+[Service]
+Type=dbus
+BusName=com.mayotix.SecurityCenter
+ExecStart=/usr/bin/python3 /usr/libexec/mayotix-security-center-daemon
+Restart=on-failure
+RestartSec=5
+
+# Hardening / Isolation Profile
+NoNewPrivileges=yes
+PrivateTmp=yes
+PrivateDevices=yes
+# Expose /var/log/audit read-only (if user service has permissions, or requires Capabilities)
+ProtectSystem=strict
+ProtectHome=read-only
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectClock=yes
+ProtectHostname=yes
+ProtectControlGroups=yes
+LockPersonality=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+RemoveIPC=yes
+PrivateIPC=yes
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6 AF_NETLINK
+RestrictNamespaces=yes
+
+[Install]
+WantedBy=default.target
