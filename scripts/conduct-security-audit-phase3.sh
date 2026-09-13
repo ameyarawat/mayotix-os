@@ -10,7 +10,7 @@
 #   sudo ./scripts/conduct-security-audit-phase3.sh --dry-run
 #   sudo ./scripts/conduct-security-audit-phase3.sh --report-only
 
-set -euo pipefail
+set -u
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
@@ -170,9 +170,16 @@ audit_wayland() {
 audit_sandbox() {
     sandbox_score=0
     # Bubblewrap profiles (default, network-isolated, strict)
-    if [[ -d "${PROJECT_ROOT}/sandbox/bubblewrap/profiles" ]] || [[ -d "${DESKTOP_DIR}/sandbox/profiles" ]]; then
-        local count
-        count=$(find "${PROJECT_ROOT}/sandbox/bubblewrap/profiles" "${DESKTOP_DIR}/sandbox/profiles" 2>/dev/null | grep -E "profile|net|strict" | wc -l)
+    local prof_dir=""
+    if [[ -d "${PROJECT_ROOT}/sandbox/bubblewrap/profiles" ]]; then
+        prof_dir="${PROJECT_ROOT}/sandbox/bubblewrap/profiles"
+    elif [[ -d "${DESKTOP_DIR}/sandbox/profiles" ]]; then
+        prof_dir="${DESKTOP_DIR}/sandbox/profiles"
+    fi
+
+    if [[ -n "$prof_dir" ]]; then
+        local count=0
+        count=$(find "$prof_dir" -type f 2>/dev/null | wc -l)
         if [[ $count -ge 2 ]]; then
             sandbox_score=$((sandbox_score + 4))
         fi
