@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Session
+Name=Mayotix Disposable Session
+Comment=Ephemeral workspace — nothing persists after logout
+Exec=/usr/bin/mayotix-disposable-session
+TryExec=/usr/bin/mayotix-disposable-session
+DesktopNames=Mayotix
+Icon=system-lock-screen

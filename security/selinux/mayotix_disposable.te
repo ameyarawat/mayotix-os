@@ -1,0 +1,116 @@
+module mayotix_disposable 1.0;
+
+require {
+    type unconfined_t;
+    type xdm_t;
+    type bin_t;
+    type lib_t;
+    type etc_t;
+    type tmp_t;
+    type tmpfs_t;
+    type var_t;
+    type var_log_t;
+    type home_root_t;
+    type user_home_t;
+    type user_home_dir_t;
+    type sysfs_t;
+    type proc_t;
+    type devpts_t;
+    type device_t;
+    type null_device_t;
+    type urandom_device_t;
+    type locale_t;
+    class file { create read write open execute execute_no_trans unlink link rename getattr append ioctl lock setattr entrypoint };
+    class dir { search open read write add_name remove_name getattr create rmdir };
+    class lnk_file { read getattr };
+    class chr_file { read write open getattr ioctl };
+    class unix_stream_socket { connectto create bind listen accept read write getattr };
+    class unix_dgram_socket { create bind sendto };
+    class sock_file { write getattr create unlink };
+    class process { transition siginh rlimitinh noatsecure signal sigchld fork setrlimit getsched setsched };
+    class capability { setuid setgid sys_chroot net_bind_service fowner chown dac_override dac_read_search };
+    class fifo_file { create read write open getattr ioctl };
+    class filesystem { associate mount };
+}
+
+# ─── Domain and executable type definitions ──────────────────────
+type mayotix_disposable_t;
+type mayotix_disposable_exec_t;
+
+# ─── Process self-management ─────────────────────────────────────
+allow mayotix_disposable_t self:process { signal sigchld fork setrlimit getsched setsched };
+allow mayotix_disposable_t mayotix_disposable_exec_t:file { entrypoint read open execute getattr };
+
+# ─── Domain transitions from display manager and user login ─────
+type_transition xdm_t mayotix_disposable_exec_t:process mayotix_disposable_t;
+allow xdm_t mayotix_disposable_t:process { transition siginh rlimitinh noatsecure };
+allow xdm_t mayotix_disposable_exec_t:file { read open execute getattr };
+
+type_transition unconfined_t mayotix_disposable_exec_t:process mayotix_disposable_t;
+allow unconfined_t mayotix_disposable_t:process { transition siginh rlimitinh noatsecure };
+allow unconfined_t mayotix_disposable_exec_t:file { read open execute getattr };
+
+# ─── System binaries and shared libraries (read-only exec) ──────
+allow mayotix_disposable_t bin_t:file { read open execute execute_no_trans getattr };
+allow mayotix_disposable_t bin_t:dir { search open getattr };
+allow mayotix_disposable_t bin_t:lnk_file { read getattr };
+allow mayotix_disposable_t lib_t:file { read open execute getattr };
+allow mayotix_disposable_t lib_t:dir { search open getattr };
+allow mayotix_disposable_t lib_t:lnk_file { read getattr };
+
+# ─── Configuration (read-only) ──────────────────────────────────
+allow mayotix_disposable_t etc_t:file { read open getattr };
+allow mayotix_disposable_t etc_t:dir { search open read getattr };
+allow mayotix_disposable_t etc_t:lnk_file { read getattr };
+allow mayotix_disposable_t locale_t:file { read open getattr };
+allow mayotix_disposable_t locale_t:dir { search open getattr };
+
+# ─── Ephemeral tmpfs workspace (the core security boundary) ─────
+#     This is the ONLY writable workspace the disposable session has.
+allow mayotix_disposable_t tmp_t:file { create read write open unlink getattr append setattr };
+allow mayotix_disposable_t tmp_t:dir { search open read write add_name remove_name getattr create rmdir };
+allow mayotix_disposable_t tmpfs_t:file { create read write open unlink getattr append setattr };
+allow mayotix_disposable_t tmpfs_t:dir { search open read write add_name remove_name getattr create rmdir };
+allow mayotix_disposable_t tmpfs_t:filesystem { associate mount };
+allow mayotix_disposable_t tmp_t:lnk_file { read getattr };
+allow mayotix_disposable_t tmp_t:fifo_file { create read write open getattr ioctl };
+
+# ─── DENY: Persistent user home directories ─────────────────────
+#     Explicit no-access to real /home — the disposable session MUST NOT
+#     read, write, or traverse the user's persistent home directory.
+#     (SELinux default-deny means omitting allow rules is sufficient,
+#     but we document the intent here for audit clarity.)
+#
+#     NO allow rules for: user_home_t, user_home_dir_t, home_root_t
+#     on file write/create/append/unlink/rename operations.
+#
+# Read-only traversal of /home root so bwrap can mount over it:
+allow mayotix_disposable_t home_root_t:dir { search getattr };
+# Block everything else — default deny enforces this.
+
+# ─── /var (read-only) ───────────────────────────────────────────
+allow mayotix_disposable_t var_t:dir { search open getattr };
+allow mayotix_disposable_t var_t:file { read open getattr };
+allow mayotix_disposable_t var_log_t:dir { search open getattr };
+
+# ─── Device nodes needed for graphical sessions ─────────────────
+allow mayotix_disposable_t device_t:dir { search open getattr };
+allow mayotix_disposable_t null_device_t:chr_file { read write open getattr };
+allow mayotix_disposable_t urandom_device_t:chr_file { read open getattr };
+allow mayotix_disposable_t devpts_t:chr_file { read write open getattr ioctl };
+
+# ─── /proc and /sys (read-only, needed by mesa / libinput) ──────
+allow mayotix_disposable_t proc_t:file { read open getattr };
+allow mayotix_disposable_t proc_t:dir { search open read getattr };
+allow mayotix_disposable_t sysfs_t:file { read open getattr };
+allow mayotix_disposable_t sysfs_t:dir { search open read getattr };
+allow mayotix_disposable_t sysfs_t:lnk_file { read getattr };
+
+# ─── Sockets: D-Bus and Wayland IPC ─────────────────────────────
+allow mayotix_disposable_t self:unix_stream_socket { connectto create bind listen accept read write getattr };
+allow mayotix_disposable_t self:unix_dgram_socket { create bind sendto };
+allow mayotix_disposable_t self:sock_file { write getattr create unlink };
+allow mayotix_disposable_t self:fifo_file { create read write open getattr ioctl };
+
+# ─── Minimal capabilities for bwrap namespace setup ─────────────
+allow mayotix_disposable_t self:capability { setuid setgid sys_chroot dac_read_search };

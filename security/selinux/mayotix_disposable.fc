@@ -1,0 +1,2 @@
+# File context definitions for MAYOTIX Disposable Session
+/usr/bin/mayotix-disposable-session		--		system_u:object_r:mayotix_disposable_exec_t:s0
