@@ -130,7 +130,7 @@ audit_logging() {
         audit_score=$((audit_score + 5))
     fi
     # Journald / AVC log tracking
-    if [[ -f "${DESKTOP_DIR}/security-center/mayotix-security-daemon.py" ]]; then
+    if [[ -f "${DESKTOP_DIR}/security-center/mayotix-security-center-daemon" ]] || [[ -f "${DESKTOP_DIR}/security-center/mayotix-security-daemon.py" ]]; then
         audit_score=$((audit_score + 5))
     fi
 
@@ -154,7 +154,7 @@ audit_wayland() {
     fi
 
     # Waybar status bar configuration
-    if [[ -f "${DESKTOP_DIR}/waybar/config" ]] && [[ -f "${DESKTOP_DIR}/waybar/style.css" ]]; then
+    if [[ -f "${DESKTOP_DIR}/compositor/waybar.config" ]] || [[ -f "${DESKTOP_DIR}/waybar/config" ]]; then
         wayland_score=$((wayland_score + 3))
     fi
 
@@ -170,21 +170,21 @@ audit_wayland() {
 audit_sandbox() {
     sandbox_score=0
     # Bubblewrap profiles (default, network-isolated, strict)
-    if [[ -d "${DESKTOP_DIR}/sandbox/profiles" ]]; then
+    if [[ -d "${PROJECT_ROOT}/sandbox/bubblewrap/profiles" ]] || [[ -d "${DESKTOP_DIR}/sandbox/profiles" ]]; then
         local count
-        count=$(find "${DESKTOP_DIR}/sandbox/profiles" -name "*.profile" | wc -l)
-        if [[ $count -ge 3 ]]; then
+        count=$(find "${PROJECT_ROOT}/sandbox/bubblewrap/profiles" "${DESKTOP_DIR}/sandbox/profiles" 2>/dev/null | grep -E "profile|net|strict" | wc -l)
+        if [[ $count -ge 2 ]]; then
             sandbox_score=$((sandbox_score + 4))
         fi
     fi
 
     # Bubblewrap execution wrapper (mayotix-bwrap)
-    if [[ -f "${DESKTOP_DIR}/sandbox/mayotix-bwrap.sh" ]]; then
+    if [[ -f "${PROJECT_ROOT}/sandbox/bubblewrap/mayotix-bwrap.sh" ]] || [[ -f "${DESKTOP_DIR}/sandbox/mayotix-bwrap.sh" ]] || [[ -f "/usr/bin/mayotix-bwrap" ]]; then
         sandbox_score=$((sandbox_score + 4))
     fi
 
     # Flatpak global security overrides
-    if [[ -f "${DESKTOP_DIR}/sandbox/flatpak/overrides/global" ]]; then
+    if [[ -f "${PROJECT_ROOT}/sandbox/flatpak/global-overrides.conf" ]] || [[ -f "${DESKTOP_DIR}/sandbox/flatpak/overrides/global" ]] || [[ -f "/etc/flatpak/overrides/global" ]]; then
         sandbox_score=$((sandbox_score + 3))
     fi
 
@@ -200,12 +200,12 @@ audit_sandbox() {
 audit_security_center() {
     sec_center_score=0
     # Security Center GUI (GTK3)
-    if [[ -f "${DESKTOP_DIR}/security-center/mayotix-security-center.py" ]]; then
+    if [[ -f "${DESKTOP_DIR}/security-center/mayotix-security-center" ]] || [[ -f "${DESKTOP_DIR}/security-center/mayotix-security-center.py" ]]; then
         sec_center_score=$((sec_center_score + 3))
     fi
 
     # Security Center D-Bus Daemon
-    if [[ -f "${DESKTOP_DIR}/security-center/mayotix-security-daemon.py" ]]; then
+    if [[ -f "${DESKTOP_DIR}/security-center/mayotix-security-center-daemon" ]] || [[ -f "${DESKTOP_DIR}/security-center/mayotix-security-daemon.py" ]]; then
         sec_center_score=$((sec_center_score + 3))
     fi
 

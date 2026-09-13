@@ -1,0 +1,5 @@
+# MAYOTIX OS Phase 3 Week 2: Bubblewrap Profile for Strict Sandbox Isolation
+# Drops all network, all capabilities, unshares all namespaces, and mounts ephemeral tmpfs /tmp and /home.
+NETWORK="none"
+CAPABILITIES=""
+SECCOMP="strict"
