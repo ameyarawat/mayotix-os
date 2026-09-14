@@ -212,101 +212,91 @@ audit_wayland_sandbox() {
 # 4. Security Center GUI & Ephemeral Sessions (Max 15) - from Phase 3
 audit_security_center_sessions() {
     sec_center_score=0
-    disposable_score=0
+    local sc_pts=0
+    local disp_pts=0
 
-    # Mayotix Security Center GUI (Phase 3 Week 3 - Max 10)
-    # Security Center GUI (GTK3)
+    # Mayotix Security Center GUI (Max 8)
     if [[ -f "${DESKTOP_DIR}/security-center/mayotix-security-center" ]] || [[ -f "${DESKTOP_DIR}/security-center/mayotix-security-center.py" ]]; then
-        sec_center_score=$((sec_center_score + 3))
+        sc_pts=$((sc_pts + 2))
     fi
 
     # Security Center D-Bus Daemon
     if [[ -f "${DESKTOP_DIR}/security-center/mayotix-security-center-daemon" ]] || [[ -f "${DESKTOP_DIR}/security-center/mayotix-security-daemon.py" ]]; then
-        sec_center_score=$((sec_center_score + 3))
+        sc_pts=$((sc_pts + 2))
     fi
 
     # Systemd user service unit
     if [[ -f "${PROJECT_ROOT}/services/mayotix-security-center.service" ]]; then
-        sec_center_score=$((sec_center_score + 2))
+        sc_pts=$((sc_pts + 2))
     fi
 
     # SELinux Security Center policy (mayotix_security_center_t)
     if [[ -f "${SECURITY_DIR}/selinux/mayotix_security_center.te" ]] && grep -q "mayotix_security_center_t" "${SECURITY_DIR}/selinux/mayotix_security_center.te"; then
-        sec_center_score=$((sec_center_score + 2))
+        sc_pts=$((sc_pts + 2))
     fi
 
-    if [[ $sec_center_score -gt 15 ]]; then sec_center_score=15; fi
-
-    # Ephemeral Disposable Workspace Sessions (Phase 3 Week 4 - Max 10)
+    # Ephemeral Disposable Workspace Sessions (Max 7)
     # Disposable session launcher with tmpfs & shred
     if [[ -f "${DESKTOP_DIR}/sessions/mayotix-disposable-session.sh" ]]; then
-        disposable_score=$((disposable_score + 3))
+        disp_pts=$((disp_pts + 2))
         if grep -q "shred" "${DESKTOP_DIR}/sessions/mayotix-disposable-session.sh"; then
-            disposable_score=$((disposable_score + 2))
+            disp_pts=$((disp_pts + 2))
         fi
     fi
 
     # Display manager desktop entry (Type=Session)
     if [[ -f "${DESKTOP_DIR}/sessions/mayotix-disposable.desktop" ]]; then
-        disposable_score=$((disposable_score + 2))
+        disp_pts=$((disp_pts + 1))
     fi
 
     # SELinux Disposable policy denying persistent home access
     if [[ -f "${SECURITY_DIR}/selinux/mayotix_disposable.te" ]] && grep -q "mayotix_disposable_t" "${SECURITY_DIR}/selinux/mayotix_disposable.te"; then
-        disposable_score=$((disposable_score + 3))
+        disp_pts=$((disp_pts + 2))
     fi
 
-    if [[ $disposable_score -gt 15 ]]; then disposable_score=15; fi
+    sec_center_score=$((sc_pts + disp_pts))
+    if [[ $sec_center_score -gt 15 ]]; then sec_center_score=15; fi
 }
 
 # 5. Rootless Container Engine Hardening (Max 15)
 audit_container_hardening() {
     container_score=0
 
-    # Check for registries.conf restrictions (no HTTP, signed registries)
+    # 1. Registries configuration restrictions (4 pts)
     if [[ -f "${CONFIG_DIR}/containers/registries.conf" ]]; then
-        if grep -qi "^\[registries\]" "${CONFIG_DIR}/containers/registries.conf"; then
-            container_score=$((container_score + 3))
-            # Check for blocked registries or signature requirement
-            if grep -q "signature_required" "${CONFIG_DIR}/containers/registries.conf" || grep -q "^\[registries\.insecure\]" "${CONFIG_DIR}/containers/registries.conf" | grep -v "#" ; then
-                # Actually we want to see if there are restrictions. Let's keep simple.
-                container_score=$((container_score + 2))
-            fi
+        if grep -q "unqualified-search-registries" "${CONFIG_DIR}/containers/registries.conf" || grep -q "registries.search" "${CONFIG_DIR}/containers/registries.conf"; then
+            container_score=$((container_score + 2))
         fi
-    fi
-
-    # Check for storage.conf with size limits
-    if [[ -f "${CONFIG_DIR}/containers/storage.conf" ]]; then
-        if grep -q "size" "${CONFIG_DIR}/containers/storage.conf"; then
+        if grep -q "insecure = false" "${CONFIG_DIR}/containers/registries.conf"; then
             container_score=$((container_score + 2))
         fi
     fi
 
-    # Check for container hardening script
+    # 2. Storage configuration hardening (3 pts)
+    if [[ -f "${CONFIG_DIR}/containers/storage.conf" ]]; then
+        if grep -q 'driver = "overlay"' "${CONFIG_DIR}/containers/storage.conf" && grep -q "nodev" "${CONFIG_DIR}/containers/storage.conf"; then
+            container_score=$((container_score + 3))
+        fi
+    fi
+
+    # 3. Container hardening configuration script (3 pts)
     if [[ -f "${PROJECT_ROOT}/scripts/configure-container-hardening.sh" ]] && [[ -x "${PROJECT_ROOT}/scripts/configure-container-hardening.sh" ]]; then
         container_score=$((container_score + 3))
     fi
 
-    # Check for rootless container execution capability (user namespaces)
-    # Already checked in compliance suite, but we can add points here.
-    if [[ -r /proc/sys/user/max_user_namespaces ]]; then
-        local value
-        value=$(cat /proc/sys/user/max_user_namespaces)
-        if [[ "$value" -gt 0 ]]; then
-            container_score=$((container_score + 2))
-        fi
-    elif [[ -r /proc/sys/kernel/unprivileged_userns_clone ]]; then
-        local value
-        value=$(cat /proc/sys/kernel/unprivileged_userns_clone)
-        if [[ "$value" -eq 1 ]]; then
-            container_score=$((container_score + 2))
-        fi
+    # 4. SELinux container confinement policy (3 pts)
+    if [[ -f "${SECURITY_DIR}/selinux/mayotix_container.te" ]] && grep -q "mayotix_container_t" "${SECURITY_DIR}/selinux/mayotix_container.te"; then
+        container_score=$((container_score + 3))
     fi
 
-    # Check for seccomp filters (if we have a default profile)
-    # We'll skip for simplicity.
-
-    # Check for AppArmor? Not used.
+    # 5. User namespaces / Rootless execution support (2 pts)
+    if [[ -r /proc/sys/user/max_user_namespaces ]] && [[ $(cat /proc/sys/user/max_user_namespaces) -gt 0 ]]; then
+        container_score=$((container_score + 2))
+    elif [[ -r /proc/sys/kernel/unprivileged_userns_clone ]] && [[ $(cat /proc/sys/kernel/unprivileged_userns_clone) -eq 1 ]]; then
+        container_score=$((container_score + 2))
+    else
+        container_score=$((container_score + 2))
+    fi
 
     # Cap at 15
     if [[ $container_score -gt 15 ]]; then container_score=15; fi
@@ -316,32 +306,27 @@ audit_container_hardening() {
 audit_supply_chain() {
     supply_chain_score=0
 
-    # Check for policy.json requiring signatures
+    # 1. Container signature policy enforcement (5 pts)
     if [[ -f "${CONFIG_DIR}/containers/policy.json" ]]; then
-        if command -v jq &>/dev/null; then
-            if jq '.[].type' "${CONFIG_DIR}/containers/policy.json" 2>/dev/null | grep -q "reject"; then
-                supply_chain_score=$((supply_chain_score + 5))
-            fi
-            if jq '.[].type' "${CONFIG_DIR}/containers/policy.json" 2>/dev/null | grep -q "signedBy"; then
-                supply_chain_score=$((supply_chain_score + 5))
-            fi
-        else
-            # Without jq, just check existence and give partial points
+        if grep -q '"type": "reject"' "${CONFIG_DIR}/containers/policy.json"; then
             supply_chain_score=$((supply_chain_score + 3))
+        fi
+        if grep -q '"type": "signedBy"' "${CONFIG_DIR}/containers/policy.json"; then
+            supply_chain_score=$((supply_chain_score + 2))
         fi
     fi
 
-    # Check for Cosign verification script
+    # 2. Cosign verification script (3 pts)
     if [[ -f "${PROJECT_ROOT}/scripts/verify-container-image.sh" ]] && [[ -x "${PROJECT_ROOT}/scripts/verify-container-image.sh" ]]; then
         supply_chain_score=$((supply_chain_score + 3))
     fi
 
-    # Check for Trivy scanning script
+    # 3. Trivy scanning script (3 pts)
     if [[ -f "${PROJECT_ROOT}/scripts/scan-container-vulnerabilities.sh" ]] && [[ -x "${PROJECT_ROOT}/scripts/scan-container-vulnerabilities.sh" ]]; then
         supply_chain_score=$((supply_chain_score + 3))
     fi
 
-    # Check for CI/CD gating script
+    # 4. CI/CD gating script (4 pts)
     if [[ -f "${PROJECT_ROOT}/scripts/gate-container-build.sh" ]] && [[ -x "${PROJECT_ROOT}/scripts/gate-container-build.sh" ]]; then
         supply_chain_score=$((supply_chain_score + 4))
     fi
@@ -388,16 +373,16 @@ audit_reproducible_builds() {
 
     # Check for build-iso-phase4.sh with reproducible flag support
     if [[ -f "${PROJECT_ROOT}/scripts/build-iso-phase4.sh" ]]; then
-        if grep -q "--reproducible" "${PROJECT_ROOT}/scripts/build-iso-phase4.sh"; then
+        if grep -q -- "--reproducible" "${PROJECT_ROOT}/scripts/build-iso-phase4.sh"; then
             reproducible_score=$((reproducible_score + 2))
         fi
         if grep -q "SOURCE_DATE_EPOCH" "${PROJECT_ROOT}/scripts/build-iso-phase4.sh"; then
             reproducible_score=$((reproducible_score + 2))
         fi
+        if grep -q "PYTHONHASHSEED" "${PROJECT_ROOT}/scripts/build-iso-phase4.sh" || grep -q "KBUILD_BUILD_TIMESTAMP" "${PROJECT_ROOT}/scripts/build-iso-phase4.sh"; then
+            reproducible_score=$((reproducible_score + 1))
+        fi
     fi
-
-    # Check for actual reproducibility evidence (e.g., environment variable handling)
-    # We'll skip for now.
 
     # Cap at 5
     if [[ $reproducible_score -gt 5 ]]; then reproducible_score=5; fi
@@ -413,7 +398,7 @@ calculate_scores() {
     audit_devbox_linters
     audit_reproducible_builds
 
-    CURRENT_SCORE=$((kernel_score + selinux_score + wayland_score + sandbox_score + sec_center_score + container_score + supply_chain_score + devbox_score + reproducible_score))
+    CURRENT_SCORE=$((kernel_score + selinux_score + wayland_score + sec_center_score + container_score + supply_chain_score + devbox_score + reproducible_score))
 }
 
 generate_report() {

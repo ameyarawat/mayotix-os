@@ -96,7 +96,7 @@ setup_build_dirs() {
 
     mkdir -p "${BUILD_DIR}" "${ISO_DIR}" "${STAGING_DIR}" "${ROOTFS_DIR}" "${SELINUX_BUILD_DIR}"
     mkdir -p "${ISO_DIR}"/{boot/grub2,boot/efi,isolinux,EFI/BOOT}
-    mkdir -p "${ROOTFS_DIR}"/{bin,sbin,usr/bin,usr/sbin,usr/lib,usr/share,etc,var,tmp,home,root,proc,sys,dev}
+    mkdir -p "${ROOTFS_DIR}"/{bin,sbin,usr/bin,usr/sbin,usr/lib,usr/share,usr/local/bin,usr/local/sbin,etc,var,tmp,home,root,proc,sys,dev}
     mkdir -p "${ROOTFS_DIR}"/etc/{containers,mayotix/dev-environments,mayotix/systemd,systemd/system,systemd/user}
     mkdir -p "${ROOTFS_DIR}"/usr/share/{applications,wayland-sessions,doc/mayotix}
     mkdir -p "${ROOTFS_DIR}"/var/lib/containers/storage
@@ -140,6 +140,12 @@ compile_selinux() {
 stage_phase4_components() {
     log_info "Staging Phase 4 components..."
 
+    mkdir -p "${ROOTFS_DIR}/etc/containers" \
+             "${ROOTFS_DIR}/usr/local/sbin" \
+             "${ROOTFS_DIR}/usr/share/mayotix/dev-environments" \
+             "${ROOTFS_DIR}/usr/share/doc/mayotix" \
+             "${ROOTFS_DIR}/etc/systemd/system"
+
     # 1. Container Engine Configuration (Week 1)
     if [[ -f "${PROJECT_ROOT}/config/containers/registries.conf" ]]; then
         mkdir -p "${ROOTFS_DIR}/etc/containers"
@@ -152,7 +158,7 @@ stage_phase4_components() {
         log_success "Staged storage.conf"
     fi
     if [[ -f "${PROJECT_ROOT}/scripts/configure-container-hardening.sh" ]]; then
-        install -m 755 "${PROJECT_ROOT}/scripts/configure-container-hardening.sh" "${ROOTFS_DIR}/usr/local/sbin/configure-container-hardening"
+        install -D -m 755 "${PROJECT_ROOT}/scripts/configure-container-hardening.sh" "${ROOTFS_DIR}/usr/local/sbin/configure-container-hardening"
         log_success "Staged container hardening script"
     fi
 
@@ -163,43 +169,44 @@ stage_phase4_components() {
         log_success "Staged policy.json (signature attestation)"
     fi
     if [[ -f "${PROJECT_ROOT}/scripts/verify-container-image.sh" ]]; then
-        install -m 755 "${PROJECT_ROOT}/scripts/verify-container-image.sh" "${ROOTFS_DIR}/usr/local/sbin/verify-container-image"
+        install -D -m 755 "${PROJECT_ROOT}/scripts/verify-container-image.sh" "${ROOTFS_DIR}/usr/local/sbin/verify-container-image"
         log_success "Staged Cosign verification script"
     fi
     if [[ -f "${PROJECT_ROOT}/scripts/scan-container-vulnerabilities.sh" ]]; then
-        install -m 755 "${PROJECT_ROOT}/scripts/scan-container-vulnerabilities.sh" "${ROOTFS_DIR}/usr/local/sbin/scan-container-vulnerabilities"
+        install -D -m 755 "${PROJECT_ROOT}/scripts/scan-container-vulnerabilities.sh" "${ROOTFS_DIR}/usr/local/sbin/scan-container-vulnerabilities"
         log_success "Staged Trivy vulnerability scanning script"
     fi
     if [[ -f "${PROJECT_ROOT}/scripts/gate-container-build.sh" ]]; then
-        install -m 755 "${PROJECT_ROOT}/scripts/gate-container-build.sh" "${ROOTFS_DIR}/usr/local/sbin/gate-container-build"
+        install -D -m 755 "${PROJECT_ROOT}/scripts/gate-container-build.sh" "${ROOTFS_DIR}/usr/local/sbin/gate-container-build"
         log_success "Staged CI/CD gating script"
     fi
 
     # 3. Devbox Ephemeral Environments (Week 3)
     if [[ -d "${PROJECT_ROOT}/desktop/dev-environments" ]]; then
+        mkdir -p "${ROOTFS_DIR}/usr/share/mayotix/dev-environments"
         cp -r "${PROJECT_ROOT}/desktop/dev-environments"/* "${ROOTFS_DIR}/usr/share/mayotix/dev-environments/" || true
         log_success "Staged devbox wrapper, recipes, and audit hook"
     fi
     if [[ -f "${PROJECT_ROOT}/docs/PHASE4_WEEK3_DEV_ENVIRONMENTS.md" ]]; then
-        install -m 644 "${PROJECT_ROOT}/docs/PHASE4_WEEK3_DEV_ENVIRONMENTS.md" "${ROOTFS_DIR}/usr/share/doc/mayotix/devbox-guide.md"
+        install -D -m 644 "${PROJECT_ROOT}/docs/PHASE4_WEEK3_DEV_ENVIRONMENTS.md" "${ROOTFS_DIR}/usr/share/doc/mayotix/devbox-guide.md"
         log_success "Staged devbox documentation"
     fi
 
     # 4. Local CI/CD & Policy Linters (Week 4)
     if [[ -f "${PROJECT_ROOT}/scripts/install-git-hooks.sh" ]]; then
-        install -m 755 "${PROJECT_ROOT}/scripts/install-git-hooks.sh" "${ROOTFS_DIR}/usr/local/sbin/install-git-hooks"
+        install -D -m 755 "${PROJECT_ROOT}/scripts/install-git-hooks.sh" "${ROOTFS_DIR}/usr/local/sbin/install-git-hooks"
         log_success "Staged Git hooks installer"
     fi
     if [[ -f "${PROJECT_ROOT}/scripts/lint-selinux-policies.sh" ]]; then
-        install -m 755 "${PROJECT_ROOT}/scripts/lint-selinux-policies.sh" "${ROOTFS_DIR}/usr/local/sbin/lint-selinux-policies"
+        install -D -m 755 "${PROJECT_ROOT}/scripts/lint-selinux-policies.sh" "${ROOTFS_DIR}/usr/local/sbin/lint-selinux-policies"
         log_success "Staged SELinux policy linter"
     fi
     if [[ -f "${PROJECT_ROOT}/scripts/test-phase4-compliance.sh" ]]; then
-        install -m 755 "${PROJECT_ROOT}/scripts/test-phase4-compliance.sh" "${ROOTFS_DIR}/usr/local/sbin/test-phase4-compliance"
+        install -D -m 755 "${PROJECT_ROOT}/scripts/test-phase4-compliance.sh" "${ROOTFS_DIR}/usr/local/sbin/test-phase4-compliance"
         log_success "Staged Phase 4 compliance test suite"
     fi
     if [[ -f "${PROJECT_ROOT}/docs/PHASE4_WEEK4_POLICY_LINTERS.md" ]]; then
-        install -m 644 "${PROJECT_ROOT}/docs/PHASE4_WEEK4_POLICY_LINTERS.md" "${ROOTFS_DIR}/usr/share/doc/mayotix/policy-linters-guide.md"
+        install -D -m 644 "${PROJECT_ROOT}/docs/PHASE4_WEEK4_POLICY_LINTERS.md" "${ROOTFS_DIR}/usr/share/doc/mayotix/policy-linters-guide.md"
         log_success "Staged policy linters documentation"
     fi
 
