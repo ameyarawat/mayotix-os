@@ -1,0 +1,69 @@
+module mayotix_container 1.0;
+
+require {
+    type unconfined_t;
+    type xdm_t;
+    type tmp_t;
+    type var_t;
+    type home_root_t;
+    type user_home_t;
+    type bin_t;
+    type lib_t;
+    type etc_t;
+    type devpts_t;
+    class unix_stream_socket { connectto create bind listen accept getattr };
+    class unix_dgram_socket { create connect sendto };
+    class sock_file { write getattr create unlink };
+    class file { create read write open execute execute_no_trans unlink link rename getattr entrypoint map };
+    class dir { search open read write add_name remove_name getattr rmdir };
+    class process { transition siginh rlimitinh noatsecure signal getsched setsched };
+    class capability { net_bind_service setuid setgid sys_admin sys_chroot sys_ptrace chown dac_override fowner };
+    class chr_file { read write open getattr ioctl };
+}
+
+# Define container domain and execution type
+type mayotix_container_t;
+type mayotix_container_exec_t;
+
+# Process entrypoint
+allow mayotix_container_t self:process { signal getsched setsched };
+allow mayotix_container_t mayotix_container_exec_t:file { entrypoint read open execute getattr map };
+
+# Allow domain transitions from user and display sessions
+type_transition unconfined_t mayotix_container_exec_t:process mayotix_container_t;
+allow unconfined_t mayotix_container_t:process { transition siginh rlimitinh noatsecure };
+allow unconfined_t mayotix_container_exec_t:file { read open execute getattr };
+
+type_transition xdm_t mayotix_container_exec_t:process mayotix_container_t;
+allow xdm_t mayotix_container_t:process { transition siginh rlimitinh noatsecure };
+allow xdm_t mayotix_container_exec_t:file { read open execute getattr };
+
+# System library & binary execution
+allow mayotix_container_t bin_t:file { read open execute execute_no_trans getattr map };
+allow mayotix_container_t lib_t:file { read open execute getattr map };
+
+# Configuration access
+allow mayotix_container_t etc_t:file { read open getattr };
+allow mayotix_container_t etc_t:dir { search open getattr };
+
+# Container storage and state in var/tmp
+allow mayotix_container_t tmp_t:file { create read write open unlink getattr map };
+allow mayotix_container_t tmp_t:dir { search open read write add_name remove_name getattr rmdir };
+allow mayotix_container_t var_t:file { create read write open unlink getattr map };
+allow mayotix_container_t var_t:dir { search open read write add_name remove_name getattr rmdir };
+
+# User home rootless storage access
+allow mayotix_container_t home_root_t:dir { search open getattr };
+allow mayotix_container_t user_home_t:dir { search open read write add_name remove_name getattr rmdir };
+allow mayotix_container_t user_home_t:file { create read write open unlink getattr map };
+
+# Pseudo-terminal access
+allow mayotix_container_t devpts_t:chr_file { read write open getattr ioctl };
+
+# Sockets and IPC
+allow mayotix_container_t self:unix_stream_socket { connectto create bind listen accept getattr };
+allow mayotix_container_t self:unix_dgram_socket { create connect sendto };
+allow mayotix_container_t self:sock_file { write getattr create unlink };
+
+# Linux capabilities permitted inside user namespaces
+allow mayotix_container_t self:capability { net_bind_service setuid setgid sys_admin sys_chroot chown dac_override fowner };
