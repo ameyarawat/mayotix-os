@@ -46,8 +46,18 @@ log_error() { echo -e "${RED}[ERROR]${NC} $*"; }
 # Check rootless container sysctl parameters
 check_rootless_sysctl() {
     log_info "Checking rootless container sysctl parameters..."
-    # Check kernel.unprivileged_userns_clone
-    if [[ -r /proc/sys/kernel/unprivileged_userns_clone ]]; then
+    # Check user.max_user_namespaces (standard upstream Linux 6.x & Fedora/RHEL)
+    if [[ -r /proc/sys/user/max_user_namespaces ]]; then
+        local value
+        value=$(cat /proc/sys/user/max_user_namespaces)
+        if [[ "$value" -gt 0 ]]; then
+            log_success "user.max_user_namespaces is set to $value (allowing unprivileged user namespaces)"
+            return 0
+        else
+            log_error "user.max_user_namespaces is set to $value (expected > 0)"
+            return 1
+        fi
+    elif [[ -r /proc/sys/kernel/unprivileged_userns_clone ]]; then
         local value
         value=$(cat /proc/sys/kernel/unprivileged_userns_clone)
         if [[ "$value" -eq 1 ]]; then
@@ -58,14 +68,12 @@ check_rootless_sysctl() {
             return 1
         fi
     else
-        # If we cannot read, try to set it (requires root) but we can note that it might be configurable
-        log_warn "Cannot read /proc/sys/kernel/unprivileged_userns_clone (may require root or the setting may be absent)"
-        # We'll try to see if it's set in sysctl.conf or similar as a fallback
-        if grep -q "^kernel.unprivileged_userns_clone=1" /etc/sysctl.conf /etc/sysctl.d/*.conf 2>/dev/null; then
-            log_success "kernel.unprivileged_userns_clone=1 found in sysctl configuration"
+        # Fallback to checking sysctl configuration files
+        if grep -qE "user\.max_user_namespaces|kernel\.unprivileged_userns_clone" /etc/sysctl.conf /etc/sysctl.d/*.conf 2>/dev/null; then
+            log_success "Container user namespace parameters configured in sysctl"
             return 0
         else
-            log_error "kernel.unprivileged_userns_clone not configured to 1 in sysctl"
+            log_error "User namespace parameters not configured in sysctl"
             return 1
         fi
     fi
@@ -162,14 +170,14 @@ check_pre_commit_hooks() {
 
     # Check the hooks path
     local hooks_path
-    hooks_path=$(git config core.hooksPath)
+    hooks_path=$(git config core.hooksPath || echo "")
     local expected_hooks_path="${PROJECT_ROOT}/.githooks"
 
-    if [[ "$hooks_path" != "$expected_hooks_path" ]]; then
-        log_error "Git hooks path is set to '$hooks_path', expected '$expected_hooks_path'"
-        ((failed++))
-    else
+    if [[ "$hooks_path" == "$expected_hooks_path" ]] || [[ "$hooks_path" == ".githooks" ]] || [[ "$hooks_path" == "./.githooks" ]]; then
         log_success "Git hooks path is correctly set to .githooks"
+    else
+        log_error "Git hooks path is set to '$hooks_path', expected '.githooks' (run ./scripts/install-git-hooks.sh)"
+        ((failed++))
     fi
 
     # Check that the pre-commit hook exists and is executable

@@ -82,7 +82,7 @@ lint_te_file() {
 
     # Check for permissive domains (domain set to permissive via permissive statement)
     if grep -q "^permissive" "$file"; then
-        log_warn("Found permissive domain declaration (should be avoided in production)")
+        log_warn "Found permissive domain declaration (should be avoided in production)"
         ((warnings++))
     fi
 
