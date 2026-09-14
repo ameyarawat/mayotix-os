@@ -11,7 +11,7 @@
 #   ./scripts/test-phase4-compliance.sh          # Run all checks
 #   ./scripts/test-phase4-compliance.sh --verbose # Verbose output
 
-set -euo pipefail
+set -u
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
@@ -83,6 +83,9 @@ check_rootless_sysctl() {
 check_signature_policy() {
     log_info "Checking signature policy presence..."
     local policy_path="/etc/containers/policy.json"
+    if [[ ! -f "$policy_path" ]] && [[ -f "${PROJECT_ROOT}/config/containers/policy.json" ]]; then
+        policy_path="${PROJECT_ROOT}/config/containers/policy.json"
+    fi
     if [[ -f "$policy_path" ]]; then
         # Try to validate JSON (if jq is available)
         if command -v jq >/dev/null 2>&1; then

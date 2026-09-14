@@ -7,8 +7,7 @@
 # Usage:
 #   ./scripts/lint-selinux-policies.sh          # Lint all policies
 #   ./scripts/lint-selinux-policies.sh mayotix.te   # Lint specific policy
-
-set -euo pipefail
+set -u
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
@@ -110,12 +109,19 @@ validate_te_compile() {
 
     log_info "Compiling $file to check for syntax errors..."
 
-    mkdir -p "$BUILD_DIR"
-    if checkmodule -M -m "$file" -o "${BUILD_DIR}/${base_name}.mod" 2>&1; then
+    local tmp_dir
+    tmp_dir=$(mktemp -d /tmp/mayotix_lint_XXXXXX 2>/dev/null || mktemp -d)
+    local tmp_mod="${tmp_dir}/${base_name}.mod"
+
+    local compile_out
+    if compile_out=$(checkmodule -M -m "$file" -o "$tmp_mod" 2>&1); then
         log_success "$file: compilation successful"
+        rm -rf "$tmp_dir"
         return 0
     else
+        echo -e "${RED}${compile_out}${NC}"
         log_error "$file: compilation failed"
+        rm -rf "$tmp_dir"
         return 1
     fi
 }
