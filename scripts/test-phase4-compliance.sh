@@ -137,10 +137,11 @@ check_devbox_recipes() {
             log_warn "No explicit USER instruction in $containerfile (may rely on base image)"
             # We don't fail because the base image might set the user
         else
-            # Check if the USER instruction sets a non-root user (we'll accept any non-zero or named user)
-            # We'll just note that we found a USER instruction and assume it's correct if it's not 'USER root' or 'USER 0'
-            if grep -q "^USER.*root\|^USER.*0[^0-9]" "$containerfile"; then
-                log_error "USER instruction in $containerfile sets to root (UID 0)"
+            # Check if the final USER instruction sets a non-root user
+            local last_user
+            last_user=$(grep "^USER" "$containerfile" | tail -n 1)
+            if echo "$last_user" | grep -qE "(root| 0[^0-9]| 0$)"; then
+                log_error "Final USER instruction in $containerfile sets to root (UID 0): $last_user"
                 ((failed++))
             fi
         fi
