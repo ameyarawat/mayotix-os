@@ -1,0 +1,32 @@
+#!/bin/bash
+# MAYOTIX OS Pre-commit security hooks
+
+# 1. Secret Detection (Simple grep for common patterns)
+echo "[HOOK] Running secret detection..."
+if git grep -E "(BEGIN (RSA|OPENSSH|PGP) PRIVATE KEY|AIza[0-9A-Za-z]{35}|xox[baprs]-[0-9a-zA-Z]{10,})" --cached > /dev/null; then
+    echo "ERROR: Potential secrets detected in staged files."
+    exit 1
+fi
+
+# 2. ShellCheck
+echo "[HOOK] Running ShellCheck..."
+for script in $(git diff --cached --name-only --diff-filter=ACM | grep '\.sh$'); do
+    if command -v shellcheck >/dev/null 2>&1; then
+        shellcheck "$script" || exit 1
+    else
+        echo "WARNING: shellcheck not installed, skipping."
+    fi
+done
+
+# 3. Hadolint
+echo "[HOOK] Running Hadolint..."
+for containerfile in $(git diff --cached --name-only --diff-filter=ACM | grep 'Containerfile$'); do
+    if command -v hadolint >/dev/null 2>&1; then
+        hadolint "$containerfile" || exit 1
+    else
+        echo "WARNING: hadolint not installed, skipping."
+    fi
+done
+
+echo "[HOOK] Pre-commit checks passed."
+exit 0
