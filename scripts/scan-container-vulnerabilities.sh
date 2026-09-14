@@ -55,6 +55,17 @@ while [[ $# -gt 0 ]]; do
             FORMAT="$2"
             shift 2
             ;;
+        -h|--help)
+            echo "Usage: $0 --image <image> [--severity <levels>] [--ignore-unfixed] [--format <fmt>] [--dry-run]"
+            echo "Options:"
+            echo "  --image <image>          Target container image reference"
+            echo "  --severity <levels>      Comma-separated severities (default: CRITICAL,HIGH)"
+            echo "  --ignore-unfixed         Ignore unpatched CVEs without fixes"
+            echo "  --format <table|json>    Report format"
+            echo "  --dry-run                Simulate vulnerability scan"
+            echo "  -h, --help               Show this help message"
+            exit 0
+            ;;
         *)
             log_error "Unknown option: $1"
             ;;

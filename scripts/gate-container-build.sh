@@ -25,6 +25,13 @@ while [[ $# -gt 0 ]]; do
             IMAGE="$2"
             shift 2
             ;;
+        -h|--help)
+            echo "Usage: $0 --image <image>"
+            echo "Options:"
+            echo "  --image <image>       Target container image reference"
+            echo "  -h, --help            Show this help message"
+            exit 0
+            ;;
         *)
             log_error "Unknown option: $1"
             ;;

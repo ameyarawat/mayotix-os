@@ -56,6 +56,16 @@ while [[ $# -gt 0 ]]; do
             KEY_FILE="$2"
             shift 2
             ;;
+        -h|--help)
+            echo "Usage: $0 --image <image> [--key <key_path>] [--verify-only] [--dry-run]"
+            echo "Options:"
+            echo "  --image <image>       Target container image reference"
+            echo "  --key <key_path>      Path to Cosign public key"
+            echo "  --verify-only         Run verification without executing/pulling"
+            echo "  --dry-run             Simulate verification step"
+            echo "  -h, --help            Show this help message"
+            exit 0
+            ;;
         *)
             log_error "Unknown option: $1"
             ;;
