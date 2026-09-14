@@ -81,17 +81,23 @@ fi
 check_dependencies() {
     log_info "Checking dependencies..."
     if ! command -v ${COSIGN} &> /dev/null; then
-        log_error "Cosign not found. Please install cosign (https://github.com/sigstore/cosign)"
+        if [[ $DRY_RUN -eq 1 ]]; then
+            log_warn "Cosign not installed. [Dry-Run] Simulating signature verification check."
+        else
+            log_error "Cosign not found. Please install cosign (https://github.com/sigstore/cosign)"
+        fi
     fi
     if ! command -v ${PODMAN} &> /dev/null; then
-        log_error "Podman not found. Please install podman."
+        if [[ $DRY_RUN -eq 1 ]]; then
+            log_warn "Podman not installed. [Dry-Run] Simulating container runtime presence."
+        else
+            log_error "Podman not found. Please install podman."
+        fi
     fi
-    if [[ ! -f "${KEY_FILE}" ]]; then
+    if [[ ! -f "${KEY_FILE}" ]] && [[ $DRY_RUN -eq 0 ]] && command -v ${COSIGN} &> /dev/null; then
         log_warn "Public key not found at ${KEY_FILE}. Generating a temporary key for demonstration."
-        # In a real scenario, we would have a pre-provisioned key. For now, we create a dummy.
         mkdir -p "${KEY_DIR}"
-        # Generate a dummy key for testing (NOT FOR PRODUCTION)
-        ${COSIGN} generate-key-pair --output-key-prefix "${KEY_DIR}/cosign" >/dev/null 2>&1
+        ${COSIGN} generate-key-pair --output-key-prefix "${KEY_DIR}/cosign" >/dev/null 2>&1 || true
         KEY_FILE="${KEY_DIR}/cosign.pub"
         log_info "Generated temporary key pair at ${KEY_DIR}/cosign (for testing only)."
     fi

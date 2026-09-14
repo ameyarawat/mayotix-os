@@ -81,7 +81,11 @@ fi
 check_dependencies() {
     log_info "Checking dependencies..."
     if ! command -v ${TRIVY} &> /dev/null; then
-        log_error "Trivy not found. Please install trivy (https://github.com/aquasecurity/trivy)"
+        if [[ $DRY_RUN -eq 1 ]]; then
+            log_warn "Trivy not installed. [Dry-Run] Simulating vulnerability scan."
+        else
+            log_error "Trivy not found. Please install trivy (https://github.com/aquasecurity/trivy)"
+        fi
     fi
 }
 
