@@ -43,9 +43,9 @@ validate_te() {
 
     log_info "Validating $file..."
 
-    # Check for policy_module declaration
-    if ! grep -q "^policy_module" "$file"; then
-        log_warn "Missing policy_module declaration"
+    # Check for module or policy_module declaration
+    if ! grep -qE "^(module|policy_module)" "$file"; then
+        log_warn "Missing module or policy_module declaration"
         ((errors++))
     fi
 
