@@ -1,0 +1,10 @@
+[Desktop Entry]
+Name=Install MAYOTIX OS
+Comment=Hardened Anaconda & Dual-Boot System Installer
+Exec=/usr/bin/python3 /usr/share/mayotix/installer/mayotix-installer-gui.py
+Icon=system-software-install
+Terminal=false
+Type=Application
+Categories=System;Settings;
+StartupNotify=true
+X-Wayland-Native=true

@@ -844,6 +844,85 @@ def cmd_game(args):
             extra.append("--dry-run")
         return _call_gaming_script("mayotix-gamemode.sh", ["status"] + extra)
 
+def cmd_install(args):
+    """Executes Anaconda installer, partition validation, and LUKS2 setup actions."""
+    action = getattr(args, "install_action", None) or "preflight"
+    dry_run = getattr(args, "dry_run", False)
+    json_out = getattr(args, "json", False)
+
+    def _call_installer_script(script_name, script_args):
+        script_path = Path(__file__).resolve().parent.parent / f"installer/{script_name}"
+        if not script_path.exists():
+            script_path = Path(f"/usr/local/sbin/{script_name}")
+        cmd = [str(script_path)] + script_args
+        if sys.platform == "win32":
+            for git_bash in [
+                r"C:\Program Files\Git\bin\bash.exe",
+                r"C:\Program Files\Git\usr\bin\bash.exe",
+            ]:
+                if os.path.exists(git_bash):
+                    cmd = [git_bash, str(script_path)] + script_args
+                    break
+        elif not os.access(str(script_path), os.X_OK):
+            cmd = ["/bin/bash", str(script_path)] + script_args
+        res = subprocess.run(cmd, capture_output=True, text=True)
+        print(res.stdout.strip() or res.stderr.strip())
+        return res.returncode
+
+    if action in ["preflight", "status"]:
+        extra = []
+        if json_out:
+            extra.append("--json")
+        if dry_run:
+            extra.append("--dry-run")
+        return _call_installer_script("mayotix-installer.sh", ["preflight"] + extra)
+
+    elif action == "disks":
+        extra = []
+        if json_out:
+            extra.append("--json")
+        if dry_run:
+            extra.append("--dry-run")
+        return _call_installer_script("partition-validator.sh", ["scan"] + extra)
+
+    elif action == "validate":
+        target = getattr(args, "target", None) or "/dev/nvme0n1"
+        extra = [target]
+        if json_out:
+            extra.append("--json")
+        if dry_run:
+            extra.append("--dry-run")
+        return _call_installer_script("partition-validator.sh", ["validate"] + extra)
+
+    elif action == "luks":
+        extra = []
+        if json_out:
+            extra.append("--json")
+        if dry_run:
+            extra.append("--dry-run")
+        return _call_installer_script("luks2-setup.sh", ["status"] + extra)
+
+    elif action == "start":
+        target = getattr(args, "target", None) or "/dev/nvme0n1"
+        extra = ["--target", target]
+        if getattr(args, "dual_boot", True):
+            extra.append("--dual-boot")
+        if getattr(args, "encrypt", True):
+            extra.append("--encrypt")
+        if json_out:
+            extra.append("--json")
+        if dry_run:
+            extra.append("--dry-run")
+        return _call_installer_script("mayotix-installer.sh", ["install"] + extra)
+
+    else:
+        extra = []
+        if json_out:
+            extra.append("--json")
+        if dry_run:
+            extra.append("--dry-run")
+        return _call_installer_script("mayotix-installer.sh", ["preflight"] + extra)
+
 def cmd_version(args):
     ver = {
         "name": "MAYOTIX OS",
@@ -1174,6 +1253,41 @@ def main():
     p_game_launch.set_defaults(func=cmd_game)
 
     p_game.set_defaults(func=cmd_game)
+
+    # mayotix install
+    p_install = subparsers.add_parser("install", parents=[common_parser], help="Manage Anaconda installer, dual-boot partition validation, and LUKS2 setup")
+    p_install.add_argument("--dry-run", action="store_true", help="Simulate installer action")
+    install_subparsers = p_install.add_subparsers(dest="install_action", help="Installer action to perform")
+
+    p_inst_pref = install_subparsers.add_parser("preflight", parents=[common_parser], help="Perform pre-flight diagnostics (UEFI, RAM, TPM2, CPU)")
+    p_inst_pref.add_argument("--dry-run", action="store_true", help="Simulate preflight")
+    p_inst_pref.set_defaults(func=cmd_install)
+
+    p_inst_status = install_subparsers.add_parser("status", parents=[common_parser], help="Display installer system readiness")
+    p_inst_status.add_argument("--dry-run", action="store_true", help="Simulate status")
+    p_inst_status.set_defaults(func=cmd_install)
+
+    p_inst_disks = install_subparsers.add_parser("disks", parents=[common_parser], help="Scan storage devices and detect existing dual-boot OS")
+    p_inst_disks.add_argument("--dry-run", action="store_true", help="Simulate disk scan")
+    p_inst_disks.set_defaults(func=cmd_install)
+
+    p_inst_val = install_subparsers.add_parser("validate", parents=[common_parser], help="Validate partition layout and dual-boot ESP isolation")
+    p_inst_val.add_argument("target", nargs="?", default="/dev/nvme0n1", help="Target disk to validate")
+    p_inst_val.add_argument("--dry-run", action="store_true", help="Simulate validation")
+    p_inst_val.set_defaults(func=cmd_install)
+
+    p_inst_luks = install_subparsers.add_parser("luks", parents=[common_parser], help="Inspect LUKS2 Argon2id encryption parameters and TPM2 status")
+    p_inst_luks.add_argument("--dry-run", action="store_true", help="Simulate LUKS query")
+    p_inst_luks.set_defaults(func=cmd_install)
+
+    p_inst_start = install_subparsers.add_parser("start", parents=[common_parser], help="Launch system installation pipeline")
+    p_inst_start.add_argument("--target", default="/dev/nvme0n1", help="Target disk device")
+    p_inst_start.add_argument("--dual-boot", action="store_true", default=True, help="Preserve existing Windows ESP partition")
+    p_inst_start.add_argument("--encrypt", action="store_true", default=True, help="Enable LUKS2 Argon2id FDE")
+    p_inst_start.add_argument("--dry-run", action="store_true", help="Simulate installation")
+    p_inst_start.set_defaults(func=cmd_install)
+
+    p_install.set_defaults(func=cmd_install)
 
     # mayotix version
     p_ver = subparsers.add_parser("version", parents=[common_parser], help="Display version and release information")

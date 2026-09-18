@@ -918,6 +918,65 @@ def handle_game_anticheat_audit(params):
         args.append("--dry-run")
     return _run_gaming_script("proton-runner.sh", args)
 
+def _run_installer_script(script_name, args, timeout=20):
+    script_path = Path(__file__).resolve().parent.parent / f"installer/{script_name}"
+    if not script_path.exists():
+        script_path = Path(f"/usr/local/sbin/{script_name}")
+    cmd = [str(script_path)] + args
+    if sys.platform == "win32":
+        for git_bash in [
+            r"C:\Program Files\Git\bin\bash.exe",
+            r"C:\Program Files\Git\usr\bin\bash.exe",
+        ]:
+            if os.path.exists(git_bash):
+                cmd = [git_bash, str(script_path)] + args
+                break
+    elif not os.access(str(script_path), os.X_OK):
+        cmd = ["/bin/bash", str(script_path)] + args
+    res = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
+    try:
+        return json.loads(res.stdout.strip())
+    except Exception:
+        return {"status": "SUCCESS" if res.returncode == 0 else "ERROR", "raw": res.stdout.strip() or res.stderr.strip()}
+
+def handle_installer_preflight(params):
+    args = ["preflight", "--json"]
+    if params.get("dry_run"):
+        args.append("--dry-run")
+    return _run_installer_script("mayotix-installer.sh", args)
+
+def handle_installer_disks(params):
+    args = ["scan", "--json"]
+    if params.get("dry_run"):
+        args.append("--dry-run")
+    return _run_installer_script("partition-validator.sh", args)
+
+def handle_installer_validate_layout(params):
+    args = ["validate"]
+    if params.get("disk"):
+        args.append(str(params["disk"]))
+    args.append("--json")
+    if params.get("dry_run"):
+        args.append("--dry-run")
+    return _run_installer_script("partition-validator.sh", args)
+
+def handle_installer_luks_status(params):
+    args = ["status", "--json"]
+    if params.get("dry_run"):
+        args.append("--dry-run")
+    return _run_installer_script("luks2-setup.sh", args)
+
+def handle_installer_simulate(params):
+    args = ["install"]
+    if params.get("target"):
+        args.extend(["--target", str(params["target"])])
+    if params.get("dual_boot"):
+        args.append("--dual-boot")
+    if params.get("encrypt"):
+        args.append("--encrypt")
+    args.extend(["--dry-run", "--json"])
+    return _run_installer_script("mayotix-installer.sh", args)
+
 # ==============================================================================
 # 3. JSON-RPC Protocol Dispatcher
 # ==============================================================================
@@ -968,6 +1027,11 @@ RPC_METHODS = {
     "game.proton_status": lambda params: handle_game_proton_status(params),
     "game.launch": lambda params: handle_game_launch(params),
     "game.anticheat_audit": lambda params: handle_game_anticheat_audit(params),
+    "installer.preflight": lambda params: handle_installer_preflight(params),
+    "installer.disks": lambda params: handle_installer_disks(params),
+    "installer.validate_layout": lambda params: handle_installer_validate_layout(params),
+    "installer.luks_status": lambda params: handle_installer_luks_status(params),
+    "installer.simulate": lambda params: handle_installer_simulate(params),
     "incident.triage": lambda params: handle_incident_triage(params),
     "incident.report": lambda params: handle_incident_report(params),
     "ping": lambda params: "pong"

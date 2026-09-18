@@ -1,0 +1,69 @@
+policy_module(mayotix_installer, 1.0.0)
+
+###############################################################################
+# MAYOTIX OS — Phase 11: Hardened Installer SELinux Type Enforcement
+# File: security/selinux/mayotix_installer.te
+# Description: Confines Anaconda kickstart and installer engines within
+#              mayotix_installer_t with block device, TPM, and EFI access,
+#              while enforcing an absolute host airgap (zero user_home_t access).
+###############################################################################
+
+require {
+    type fixed_disk_device_t;
+    type tpm_device_t;
+    type dosfs_t;
+    type boot_t;
+    type devpts_t;
+    type tmp_t;
+    class blk_file { open read write ioctl getattr };
+    class chr_file { open read write ioctl getattr };
+    class file { open read write getattr execute execute_no_trans map create unlink append };
+    class dir { search read getattr open add_name remove_name write mounton };
+    class filesystem { mount unmount getattr };
+}
+
+# ==============================================================================
+# Type Declarations
+# ==============================================================================
+type mayotix_installer_t;
+type mayotix_installer_exec_t;
+type mayotix_installer_var_t;
+
+domain_type(mayotix_installer_t)
+domain_entry_file(mayotix_installer_t, mayotix_installer_exec_t)
+files_type(mayotix_installer_var_t)
+
+# ==============================================================================
+# Block Device & LUKS Encryption Operations
+# ==============================================================================
+# Disk partitioning and LUKS2 header formatting
+allow mayotix_installer_t fixed_disk_device_t:blk_file { open read write ioctl getattr };
+
+# TPM 2.0 device access for key auto-unlock enrollment
+allow mayotix_installer_t tpm_device_t:chr_file { open read write ioctl getattr };
+
+# ==============================================================================
+# EFI System Partition & Bootloader Access
+# ==============================================================================
+# VFAT EFI filesystem management (/boot/efi)
+allow mayotix_installer_t dosfs_t:filesystem { mount unmount getattr };
+allow mayotix_installer_t dosfs_t:dir { search read getattr open add_name remove_name write };
+allow mayotix_installer_t dosfs_t:file { open read write getattr create unlink append };
+
+# Boot partition and kernel staging
+allow mayotix_installer_t boot_t:dir { search read getattr open add_name remove_name write mounton };
+allow mayotix_installer_t boot_t:file { open read write getattr create unlink append };
+
+# Interactive terminal console access
+allow mayotix_installer_t devpts_t:chr_file { open read write ioctl getattr };
+
+# Temporary installation scratch space
+allow mayotix_installer_t tmp_t:dir { search read getattr open add_name remove_name write };
+allow mayotix_installer_t tmp_t:file { open read write getattr create unlink map };
+
+# ==============================================================================
+# STRICT AIRGAP: ZERO HOST USER HOME ACCESS
+# ==============================================================================
+# By architectural mandate, mayotix_installer_t does not have access to
+# user_home_t. Live media installation processes operate strictly on target
+# block devices and system paths without inspecting host user files.
