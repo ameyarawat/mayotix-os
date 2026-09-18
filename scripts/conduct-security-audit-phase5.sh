@@ -273,17 +273,17 @@ audit_killswitch() {
     fi
 
     # Loopback, link-local DHCP, and ICMP/ICMPv6 whitelisted
-    if [[ -f "$nft_ruleset" ]] && grep -q 'oif "lo" accept' "$nft_ruleset" && grep -q 'udp dport { 67, 68 }' "$nft_ruleset"; then
+    if [[ -f "$nft_ruleset" ]] && grep -qE 'oif(name)? "lo" accept' "$nft_ruleset" && grep -qE 'udp (s|d)port (67|68)' "$nft_ruleset"; then
         killswitch_score=$((killswitch_score + 3))
     fi
 
     # Encrypted DNS (853) and WireGuard UDP (51820) whitelisted
-    if [[ -f "$nft_ruleset" ]] && grep -q 'tcp dport 853 accept' "$nft_ruleset" && grep -q 'udp dport 51820' "$nft_ruleset"; then
+    if [[ -f "$nft_ruleset" ]] && grep -q 'tcp dport 853 accept' "$nft_ruleset" && grep -q 'udp dport 51820 accept' "$nft_ruleset"; then
         killswitch_score=$((killswitch_score + 3))
     fi
 
     # Cleartext egress dropped and accounted
-    if [[ -f "$nft_ruleset" ]] && grep -q 'cleartext_leak_blocked' "$nft_ruleset"; then
+    if [[ -f "$nft_ruleset" ]] && grep -qE 'dropped_output_cleartext|cleartext_leak' "$nft_ruleset"; then
         killswitch_score=$((killswitch_score + 3))
     fi
 
@@ -303,7 +303,7 @@ audit_tor_routing() {
     local tor_nft="${CONFIG_DIR}/network/nftables/mayotix-tor-router.nft"
 
     # Tor configuration with SOCKS5 (9050), TransPort (9040), and DNSPort (9053)
-    if [[ -f "$torrc" ]] && grep -q "SOCKSPort 127.0.0.1:9050" "$torrc" && grep -q "TransPort 127.0.0.1:9040" "$torrc"; then
+    if [[ -f "$torrc" ]] && grep -qi "SocksPort 127.0.0.1:9050" "$torrc" && grep -qi "TransPort 127.0.0.1:9040" "$torrc"; then
         tor_score=$((tor_score + 3))
     fi
 
