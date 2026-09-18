@@ -285,7 +285,7 @@ livemedia-creator \
     --iso-only \
     --iso-name="$ISO_NAME" \
     --tmp="$LORAX_TMPDIR" \
-    --logfile="$ISO_OUTPUT_DIR/build.log"
+    --logfile="/var/tmp/mayotix-iso-build.log"
 
 # --------------------------------------------------------------------------
 # Step 4: Done
