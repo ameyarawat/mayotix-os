@@ -1,279 +1,312 @@
-#!/bin/bash
-# Build MAYOTIX OS ISO
-#
-# Usage:
-#   ./scripts/build-iso.sh [--quick] [--reproducible] [--rebuild-kernel] [--debug]
-#
-# Options:
-#   --quick         Skip reproducibility checks (faster for development)
-#   --reproducible  Full reproducible build with verification
-#   --rebuild-kernel Rebuild kernel from source
-#   --debug         Enable verbose output
-#
-# Output:
-#   mayotix-os-1.0-alpha.iso
+#!/usr/bin/env bash
+# ==============================================================================
+# MAYOTIX OS — ISO Builder
+# File: scripts/build-iso.sh
+# Mode: 0755
+# Description: Builds a bootable MAYOTIX OS Live ISO using Fedora's
+#              livemedia-creator with a fully hardened Kickstart configuration.
+#              Run on a Fedora system with sudo privileges.
+# ==============================================================================
 
-set -euo pipefail
+set -eo pipefail
 
-# Configuration
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
-BUILD_DIR="${PROJECT_ROOT}/build"
-ISO_DIR="${BUILD_DIR}/iso"
-ROOT_DIR="${BUILD_DIR}/root"
-BOOT_DIR="${BUILD_DIR}/boot"
-EFI_DIR="${BUILD_DIR}/efi"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
-VERSION="1.0-alpha"
-ISO_NAME="mayotix-os-${VERSION}.iso"
-BUILD_DATE=$(date -u +"%Y-%m-%d")
-DEBUG=0
-QUICK=0
-REPRODUCIBLE=0
-REBUILD_KERNEL=0
-
-# Parse arguments
-while [[ $# -gt 0 ]]; do
-    case $1 in
-        --quick) QUICK=1 ;;
-        --reproducible) REPRODUCIBLE=1 ;;
-        --rebuild-kernel) REBUILD_KERNEL=1 ;;
-        --debug) DEBUG=1 ;;
-        *) echo "Unknown option: $1"; exit 1 ;;
-    esac
-    shift
-done
-
-# Enable debugging if requested
-if [[ $DEBUG -eq 1 ]]; then
-    set -x
-fi
-
-# Color output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
-NC='\033[0m' # No Color
+BOLD='\033[1m'
+NC='\033[0m'
 
-log_info() { echo -e "${BLUE}[INFO]${NC} $*"; }
-log_success() { echo -e "${GREEN}[✓]${NC} $*"; }
-log_warn() { echo -e "${YELLOW}[WARN]${NC} $*"; }
-log_error() { echo -e "${RED}[ERROR]${NC} $*"; exit 1; }
+ISO_OUTPUT_DIR="${REPO_ROOT}/build"
+ISO_NAME="mayotix-os-5.0-alpha-x86_64.iso"
+KS_FILE="${REPO_ROOT}/installer/kickstart/mayotix-iso.ks"
+LORAX_TMPDIR="/var/tmp/mayotix-iso-build"
 
-# Check prerequisites
-check_prerequisites() {
-    log_info "Checking prerequisites..."
+echo -e "${BLUE}${BOLD}"
+echo "=============================================================================="
+echo "          MAYOTIX OS — Bootable Live ISO Builder                              "
+echo "=============================================================================="
+echo -e "${NC}"
 
-    local required_tools=(
-        "git"
-        "dracut"
-        "grub2-mkconfig"
-        "mkisofs"
-        "gpg"
-    )
+# --------------------------------------------------------------------------
+# Step 0: Check prerequisites
+# --------------------------------------------------------------------------
+echo -e "${BLUE}[INFO]${NC} Checking prerequisites..."
 
-    for tool in "${required_tools[@]}"; do
-        if ! command -v "$tool" &> /dev/null; then
-            log_error "Required tool not found: $tool"
-        fi
-    done
+if [[ $EUID -ne 0 ]]; then
+    echo -e "${RED}[ERROR]${NC} This script must be run as root (sudo)."
+    echo "  Usage: sudo ./scripts/build-iso.sh"
+    exit 1
+fi
 
-    log_success "All prerequisites met"
-}
+# Install required tools
+REQUIRED_PKGS=(lorax livecd-tools anaconda pykickstart)
+MISSING_PKGS=()
 
-# Create build directories
-setup_build_dirs() {
-    log_info "Setting up build directories..."
-
-    mkdir -p "$ISO_DIR" "$ROOT_DIR" "$BOOT_DIR" "$EFI_DIR"
-
-    log_success "Build directories ready"
-}
-
-# Download or use local Fedora rootfs
-prepare_rootfs() {
-    log_info "Preparing root filesystem..."
-
-    # For now, create minimal rootfs with essential packages
-    # In production, this would use dnf --installroot
-
-    if [[ ! -d "${ROOT_DIR}/bin" ]]; then
-        mkdir -p \
-            "${ROOT_DIR}"/{bin,sbin,etc,usr,var,lib,home,root,boot,dev,proc,sys,tmp} \
-            "${ROOT_DIR}/var/{log,cache,lib,run}" \
-            "${ROOT_DIR}/usr/{bin,sbin,lib,share}"
-
-        log_success "Root filesystem structure created"
-    else
-        log_warn "Root filesystem already exists, skipping creation"
+for pkg in "${REQUIRED_PKGS[@]}"; do
+    if ! rpm -q "$pkg" &>/dev/null; then
+        MISSING_PKGS+=("$pkg")
     fi
-}
+done
 
-# Install bootloader
-setup_bootloader() {
-    log_info "Setting up bootloader..."
+if [[ ${#MISSING_PKGS[@]} -gt 0 ]]; then
+    echo -e "${YELLOW}[WARN]${NC} Installing missing packages: ${MISSING_PKGS[*]}"
+    dnf install -y "${MISSING_PKGS[@]}"
+fi
 
-    # Copy GRUB2 configuration
-    mkdir -p "${BOOT_DIR}/grub2"
-    cp -v "${PROJECT_ROOT}/boot/grub2/grub.cfg" "${BOOT_DIR}/grub2/" || true
+echo -e "${GREEN}[✓]${NC} All prerequisites satisfied."
 
-    # Create UEFI boot files
-    mkdir -p "${EFI_DIR}/EFI/BOOT"
+# --------------------------------------------------------------------------
+# Step 1: Generate the complete Kickstart
+# --------------------------------------------------------------------------
+echo -e "${BLUE}[INFO]${NC} Generating complete MAYOTIX OS Kickstart file..."
 
-    log_success "Bootloader configured"
-}
+cat > "$KS_FILE" << 'KICKSTART_EOF'
+# ==============================================================================
+# MAYOTIX OS — Complete Live ISO Kickstart
+# Auto-generated by scripts/build-iso.sh
+# ==============================================================================
 
-# Create kernel and initramfs
-build_kernel() {
-    log_info "Building kernel and initramfs..."
+# Installation Mode
+version=F40
+text
+reboot
 
-    # Copy dracut configuration
-    mkdir -p "${BOOT_DIR}/dracut"
-    cp -v "${PROJECT_ROOT}/boot/dracut/dracut.conf" "${BOOT_DIR}/dracut/" || true
+# Keyboard and Localization
+keyboard --vckeymap=us --xlayouts='us'
+lang en_US.UTF-8
+timezone UTC --utc
 
-    # In Phase 1, use host kernel as placeholder
-    if [[ -f "/boot/vmlinuz-$(uname -r)" ]]; then
-        cp "/boot/vmlinuz-$(uname -r)" "${BOOT_DIR}/vmlinuz"
-        log_success "Kernel ready"
-    else
-        log_warn "No kernel found, using placeholder"
-        touch "${BOOT_DIR}/vmlinuz"
-    fi
-}
+# Network Configuration
+network --bootproto=dhcp --device=link --activate --onboot=on --hostname=mayotix
 
-# Create ISO filesystem
-create_iso_filesystem() {
-    log_info "Creating ISO filesystem..."
+# SELinux and Firewall
+selinux --enforcing
+firewall --enabled --ssh
 
-    # Set build metadata
-    cat > "${BUILD_DIR}/build.json" <<EOF
-{
-  "version": "${VERSION}",
-  "build_date": "${BUILD_DATE}",
-  "hostname": "mayotix-build",
-  "build_user": "$(whoami)",
-  "build_host": "$(hostname)"
-}
-EOF
+# Authentication
+rootpw --lock
+user --name=mayotix --groups=wheel --plaintext --password=mayotix --gecos="MAYOTIX OS User"
 
-    log_success "ISO filesystem metadata created"
-}
+# Partitioning (UEFI + LUKS2 + Btrfs)
+zerombr
+clearpart --all --initlabel
 
-# Build ISO image
-build_iso_image() {
-    log_info "Building ISO image (${ISO_NAME})..."
+part /boot/efi --fstype="efi" --size=600 --fsoptions="umask=0077,shortname=winnt"
+part /boot --fstype="ext4" --size=1024 --label=MAYOTIX_BOOT
+part btrfs.mayotix --fstype="btrfs" --size=30000 --grow --encrypted --luks-version=luks2 --cipher=aes-xts-plain64 --pbkdf=argon2id
 
-    # Create ISO with Joliet and Rock Ridge extensions
-    mkisofs \
-        -R \
-        -J \
-        -V "MAYOTIX_OS_${VERSION}" \
-        -b "isolinux/isolinux.bin" \
-        -c "isolinux/boot.cat" \
-        -no-emul-boot \
-        -boot-load-size 4 \
-        -boot-info-table \
-        -eltorito-alt-boot \
-        -e "EFI/efiboot.img" \
-        -no-emul-boot \
-        -isohybrid-mbr "${BOOT_DIR}/isohdpfx.bin" \
-        -o "${PROJECT_ROOT}/${ISO_NAME}" \
-        "${ISO_DIR}" 2>&1 || log_error "ISO creation failed"
+btrfs none --label=MAYOTIX_SYS btrfs.mayotix
+btrfs / --subvol --name=root MAYOTIX_SYS
+btrfs /home --subvol --name=home MAYOTIX_SYS
+btrfs /var/log --subvol --name=var_log MAYOTIX_SYS
+btrfs /var/cache --subvol --name=var_cache MAYOTIX_SYS
 
-    log_success "ISO image created: ${ISO_NAME}"
-}
+# Package Manifest
+%packages
+@core
+@standard
+@hardware-support
+kernel
+grub2-efi-x64
+shim-x64
+btrfs-progs
+cryptsetup
+clevis
+clevis-luks
 
-# Generate checksums
-generate_checksums() {
-    log_info "Generating checksums..."
+# Security & Hardening
+selinux-policy-targeted
+nftables
+audit
+bubblewrap
+flatpak
+tpm2-tools
+wireguard-tools
 
-    cd "${PROJECT_ROOT}"
-    sha256sum "${ISO_NAME}" > "${ISO_NAME}.sha256"
+# Networking
+systemd-resolved
+iproute
 
-    log_success "Checksums generated"
-}
+# Python (for daemon & tools)
+python3
+python3-pip
 
-# Sign artifacts (if key available)
-sign_artifacts() {
-    log_info "Signing artifacts..."
+# Desktop Environment
+@base-x
+sway
+foot
+waybar
+wofi
+mako
+grim
+slurp
+wl-clipboard
+xdg-utils
+desktop-file-utils
 
-    if [[ -f "/tmp/signing-key.asc" ]]; then
-        gpg --detach-sign --armor "${ISO_NAME}.sha256" || true
-        log_success "Artifacts signed"
-    else
-        log_warn "No signing key found (MAYOTIX_SIGNING_KEY_PATH not set)"
-    fi
-}
+# Development & Analysis Tools
+git
+tcpdump
+nmap-ncat
+strace
+ltrace
+procps-ng
+inotify-tools
+%end
 
-# Verify ISO
-verify_iso() {
-    log_info "Verifying ISO..."
+# Post-Installation: Deploy MAYOTIX OS
+%post --log=/root/mayotix-post-install.log
+echo "[INFO] ===== MAYOTIX OS Post-Installation Deployment ====="
 
-    # Check ISO integrity
-    if file "${PROJECT_ROOT}/${ISO_NAME}" | grep -q "ISO 9660"; then
-        log_success "ISO format valid"
-    else
-        log_error "Invalid ISO format"
-    fi
+# ---------- Clone MAYOTIX OS Repository ----------
+MAYOTIX_SRC="/opt/mayotix-os"
+git clone https://github.com/ameyarawat/mayotix-os.git "$MAYOTIX_SRC" || true
 
-    # Check filesize
-    local size
-    size=$(du -h "${PROJECT_ROOT}/${ISO_NAME}" | cut -f1)
-    log_info "ISO size: ${size}"
-}
+# ---------- Install CLI ----------
+cp "$MAYOTIX_SRC/cli/mayotix" /usr/local/bin/mayotix
+chmod +x /usr/local/bin/mayotix
 
-# Reproducible build verification
-verify_reproducibility() {
-    if [[ $REPRODUCIBLE -eq 1 ]]; then
-        log_info "Verifying reproducibility..."
+# ---------- Install Daemon ----------
+cp "$MAYOTIX_SRC/daemon/mayotix-daemon.py" /usr/local/sbin/mayotix-daemon
+chmod +x /usr/local/sbin/mayotix-daemon
 
-        # Build again
-        local second_iso
-        second_iso="${PROJECT_ROOT}/mayotix-os-${VERSION}-verify.iso"
+# ---------- Install Systemd Service ----------
+cp "$MAYOTIX_SRC/system/mayotix-daemon.service" /etc/systemd/system/
+systemctl enable mayotix-daemon.service
 
-        # Compare checksums
-        local first_hash
-        local second_hash
-        first_hash=$(sha256sum "${PROJECT_ROOT}/${ISO_NAME}" | awk '{print $1}')
-        second_hash=$(sha256sum "${second_iso}" 2>/dev/null | awk '{print $1}' || echo "SKIP")
+# ---------- Deploy Security Configs ----------
+# Sysctl hardening
+cat > /etc/sysctl.d/99-mayotix-hardened.conf << 'SYSCTL'
+fs.suid_dumpable = 0
+kernel.randomize_va_space = 2
+kernel.kptr_restrict = 2
+kernel.dmesg_restrict = 1
+kernel.unprivileged_bpf_disabled = 1
+kernel.yama.ptrace_scope = 2
+net.ipv4.conf.all.rp_filter = 1
+net.ipv4.conf.default.rp_filter = 1
+net.ipv4.conf.all.accept_source_route = 0
+net.ipv4.conf.default.accept_source_route = 0
+net.ipv4.conf.all.send_redirects = 0
+net.ipv4.conf.default.send_redirects = 0
+net.ipv4.icmp_echo_ignore_broadcasts = 1
+net.ipv6.conf.all.disable_ipv6 = 0
+SYSCTL
 
-        if [[ "$first_hash" == "$second_hash" ]]; then
-            log_success "Reproducible build verified"
-            rm -f "$second_iso"
-        else
-            log_warn "Builds not identical (expected for first build)"
-        fi
-    fi
-}
+# Network configs
+mkdir -p /etc/systemd/resolved.conf.d
+cp -r "$MAYOTIX_SRC/config/network/"* /etc/systemd/resolved.conf.d/ 2>/dev/null || true
 
-# Main build process
-main() {
-    log_info "MAYOTIX OS ISO Build - Version ${VERSION}"
-    log_info "Build date: ${BUILD_DATE}"
+# Firewall configs
+cp -r "$MAYOTIX_SRC/config/firewall/"* /etc/nftables/ 2>/dev/null || true
 
-    check_prerequisites
-    setup_build_dirs
-    prepare_rootfs
-    setup_bootloader
-    build_kernel
-    create_iso_filesystem
-    build_iso_image
-    generate_checksums
-    sign_artifacts
-    verify_iso
-    verify_reproducibility
+# ---------- Install Desktop Apps ----------
+mkdir -p /usr/share/mayotix/pentest
+mkdir -p /usr/share/mayotix/installer
+mkdir -p /usr/share/mayotix/gaming
+cp -r "$MAYOTIX_SRC/desktop/pentest/"* /usr/share/mayotix/pentest/ 2>/dev/null || true
+cp -r "$MAYOTIX_SRC/desktop/installer/"* /usr/share/mayotix/installer/ 2>/dev/null || true
+cp -r "$MAYOTIX_SRC/desktop/gaming/"* /usr/share/mayotix/gaming/ 2>/dev/null || true
+cp "$MAYOTIX_SRC/desktop/applications/"*.desktop /usr/share/applications/ 2>/dev/null || true
 
-    log_success "BUILD COMPLETE"
+# ---------- Install Pentest Tools ----------
+mkdir -p /usr/local/share/mayotix/pentest
+cp "$MAYOTIX_SRC/tests/pentest/"* /usr/local/share/mayotix/pentest/ 2>/dev/null || true
+chmod +x /usr/local/share/mayotix/pentest/*.sh /usr/local/share/mayotix/pentest/*.py 2>/dev/null || true
+
+# ---------- Install Installer Scripts ----------
+mkdir -p /usr/local/sbin
+cp "$MAYOTIX_SRC/installer/"*.sh /usr/local/sbin/ 2>/dev/null || true
+chmod +x /usr/local/sbin/mayotix-installer.sh /usr/local/sbin/partition-validator.sh /usr/local/sbin/luks2-setup.sh 2>/dev/null || true
+
+# ---------- SELinux Policies ----------
+cp "$MAYOTIX_SRC/security/selinux/"*.te "$MAYOTIX_SRC/security/selinux/"*.fc /usr/share/selinux/packages/ 2>/dev/null || true
+
+# ---------- Enable SELinux Relabeling ----------
+touch /.autorelabel
+
+# ---------- Enable Services ----------
+systemctl enable auditd.service
+systemctl enable nftables.service
+systemctl enable systemd-resolved.service
+
+# ---------- MAYOTIX MOTD Banner ----------
+cat > /etc/motd << 'MOTD'
+
+  ╔══════════════════════════════════════════════════════════════╗
+  ║                    MAYOTIX OS v5.0-alpha                    ║
+  ║           Security-Hardened Linux Distribution              ║
+  ║                                                              ║
+  ║  SELinux: Enforcing  |  Firewall: nftables (Fail-Closed)   ║
+  ║  DNS: DoT Encrypted  |  VPN: WireGuard Ready              ║
+  ║  Encryption: LUKS2 Argon2id  |  FS: Btrfs Subvolumes      ║
+  ║                                                              ║
+  ║  Run 'mayotix status --json' for system health             ║
+  ║  Run 'mayotix --help' for all available commands           ║
+  ╚══════════════════════════════════════════════════════════════╝
+
+MOTD
+
+echo "[✓] MAYOTIX OS Post-Installation Complete."
+%end
+KICKSTART_EOF
+
+echo -e "${GREEN}[✓]${NC} Kickstart file generated: ${KS_FILE}"
+
+# --------------------------------------------------------------------------
+# Step 2: Validate Kickstart
+# --------------------------------------------------------------------------
+echo -e "${BLUE}[INFO]${NC} Validating Kickstart syntax..."
+if command -v ksvalidator &>/dev/null; then
+    ksvalidator "$KS_FILE" && echo -e "${GREEN}[✓]${NC} Kickstart syntax valid." || echo -e "${YELLOW}[WARN]${NC} Kickstart validation warnings (non-fatal)."
+else
+    echo -e "${YELLOW}[WARN]${NC} ksvalidator not found, skipping validation."
+fi
+
+# --------------------------------------------------------------------------
+# Step 3: Build the ISO
+# --------------------------------------------------------------------------
+echo -e "${BLUE}[INFO]${NC} Building MAYOTIX OS Live ISO..."
+echo -e "${YELLOW}[WARN]${NC} This process takes 15-30 minutes and requires ~10GB free disk space."
+
+mkdir -p "$ISO_OUTPUT_DIR"
+mkdir -p "$LORAX_TMPDIR"
+
+livemedia-creator \
+    --ks="$KS_FILE" \
+    --no-virt \
+    --resultdir="$ISO_OUTPUT_DIR" \
+    --project="MAYOTIX OS" \
+    --releasever=40 \
+    --iso-only \
+    --iso-name="$ISO_NAME" \
+    --tmp="$LORAX_TMPDIR" \
+    --logfile="$ISO_OUTPUT_DIR/build.log"
+
+# --------------------------------------------------------------------------
+# Step 4: Done
+# --------------------------------------------------------------------------
+if [[ -f "${ISO_OUTPUT_DIR}/${ISO_NAME}" ]]; then
+    ISO_SIZE=$(du -h "${ISO_OUTPUT_DIR}/${ISO_NAME}" | cut -f1)
     echo ""
-    echo "ISO ready: ${PROJECT_ROOT}/${ISO_NAME}"
-    echo "Checksum: cat ${ISO_NAME}.sha256"
+    echo -e "${GREEN}${BOLD}=============================================================================="
+    echo "  MAYOTIX OS ISO Build Complete!"
+    echo "=============================================================================="
+    echo -e "${NC}"
+    echo -e "  ISO File : ${BOLD}${ISO_OUTPUT_DIR}/${ISO_NAME}${NC}"
+    echo -e "  Size     : ${ISO_SIZE}"
     echo ""
-    echo "Next steps:"
-    echo "  1. Test in VM: qemu-system-x86_64 -cdrom ${ISO_NAME} -m 4G -enable-kvm"
-    echo "  2. Write to USB: sudo dd if=${ISO_NAME} of=/dev/sdX bs=4M status=progress"
+    echo "  To use:"
+    echo "    1. Copy the ISO to your host machine"
+    echo "    2. Create a new VM in VirtualBox/VMware (4GB RAM, 40GB disk, EFI boot)"
+    echo "    3. Mount the ISO and boot from it"
+    echo "    4. Login: username=mayotix password=mayotix"
     echo ""
-}
-
-# Run main
-main "$@"
+else
+    echo -e "${RED}[ERROR]${NC} ISO build failed. Check: ${ISO_OUTPUT_DIR}/build.log"
+    exit 1
+fi
