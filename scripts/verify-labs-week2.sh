@@ -254,6 +254,7 @@ declare -a EXPECTED_METHODS=(
     "lab.network_status"
     "lab.sinkhole_start"
     "lab.sinkhole_stop"
+    "lab.sinkhole_status"
     "lab.sinkhole_logs"
 )
 
@@ -290,6 +291,13 @@ if "$PYTHON_BIN" "$CLI_PATH" lab network start --dry-run >/dev/null 2>&1; then
     pass_test "Unified CLI executes 'mayotix lab network start --dry-run'"
 else
     fail_test "CLI failed to execute 'mayotix lab network start --dry-run'"
+fi
+
+# Test mayotix lab sinkhole status --dry-run
+if "$PYTHON_BIN" "$CLI_PATH" lab sinkhole status --dry-run >/dev/null 2>&1; then
+    pass_test "Unified CLI executes 'mayotix lab sinkhole status --dry-run'"
+else
+    fail_test "CLI failed to execute 'mayotix lab sinkhole status --dry-run'"
 fi
 
 # Test mayotix lab sinkhole start --dry-run

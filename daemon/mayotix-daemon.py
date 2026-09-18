@@ -535,6 +535,20 @@ def handle_lab_sinkhole_start(params):
     except Exception:
         return {"status": "UNKNOWN", "raw": res.stdout.strip()}
 
+def handle_lab_sinkhole_status(params):
+    sink_script = Path(__file__).resolve().parent.parent / "desktop/labs/sinkhole.py"
+    if not sink_script.exists():
+        sink_script = Path("/usr/share/mayotix/labs/sinkhole.py")
+
+    cmd = [sys.executable, str(sink_script), "--json"]
+    if params.get("dry_run"):
+        cmd.append("--dry-run")
+    res = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
+    try:
+        return json.loads(res.stdout.strip())
+    except Exception:
+        return {"service": "mayotix-sinkhole", "status": "UNKNOWN", "raw": res.stdout.strip()}
+
 def handle_lab_sinkhole_stop(params):
     return {"success": True, "action": "sinkhole_stop", "status": "STOPPED"}
 
@@ -611,6 +625,7 @@ RPC_METHODS = {
     "lab.network_status": lambda params: handle_lab_network_status(params),
     "lab.sinkhole_start": lambda params: handle_lab_sinkhole_start(params),
     "lab.sinkhole_stop": lambda params: handle_lab_sinkhole_stop(params),
+    "lab.sinkhole_status": lambda params: handle_lab_sinkhole_status(params),
     "lab.sinkhole_logs": lambda params: handle_lab_sinkhole_logs(params),
     "incident.triage": lambda params: handle_incident_triage(params),
     "incident.report": lambda params: handle_incident_report(params),

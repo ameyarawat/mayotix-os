@@ -580,6 +580,15 @@ def cmd_lab(args):
         elif sub_action == "stop":
             print(f"{GREEN}[✓]{NC} Sinkhole service stopped cleanly.")
             return 0
+        elif sub_action == "status":
+            cmd = [sys.executable, str(sink_script)]
+            if getattr(args, "json", False):
+                cmd.append("--json")
+            if getattr(args, "dry_run", False):
+                cmd.append("--dry-run")
+            res = subprocess.run(cmd, capture_output=True, text=True)
+            print(res.stdout.strip() or res.stderr.strip())
+            return res.returncode
         else:
             # start
             cmd = [sys.executable, str(sink_script)]
@@ -858,6 +867,10 @@ def main():
     p_sink_logs = sink_subparsers.add_parser("logs", parents=[common_parser], help="Inspect intercepted HTTP C2 and DNS queries")
     p_sink_logs.add_argument("--dry-run", action="store_true", help="Simulate logs query")
     p_sink_logs.set_defaults(func=cmd_lab)
+
+    p_sink_status = sink_subparsers.add_parser("status", parents=[common_parser], help="Query dynamic traffic sinkhole posture")
+    p_sink_status.add_argument("--dry-run", action="store_true", help="Simulate status query")
+    p_sink_status.set_defaults(func=cmd_lab)
 
     p_lab_sink.set_defaults(func=cmd_lab)
 
