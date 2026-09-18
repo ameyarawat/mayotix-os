@@ -532,6 +532,67 @@ def cmd_lab(args):
         print(res.stdout.strip() or res.stderr.strip())
         return res.returncode
 
+    elif action == "network":
+        net_script = Path(__file__).resolve().parent.parent / "desktop/labs/lab-network.sh"
+        if not net_script.exists():
+            net_script = Path("/usr/local/sbin/mayotix-lab-network")
+        net_cmd = [str(net_script)]
+        if sys.platform == "win32":
+            for git_bash in [
+                r"C:\Program Files\Git\bin\bash.exe",
+                r"C:\Program Files\Git\usr\bin\bash.exe",
+            ]:
+                if os.path.exists(git_bash):
+                    net_cmd = [git_bash, str(net_script)]
+                    break
+        elif not os.access(str(net_script), os.X_OK):
+            net_cmd = ["/bin/bash", str(net_script)]
+
+        sub_action = getattr(args, "network_action", None) or "status"
+        cmd = list(net_cmd) + [sub_action]
+        if getattr(args, "json", False):
+            cmd.append("--json")
+        if getattr(args, "dry_run", False):
+            cmd.append("--dry-run")
+        res = subprocess.run(cmd, capture_output=True, text=True)
+        print(res.stdout.strip() or res.stderr.strip())
+        return res.returncode
+
+    elif action == "sinkhole":
+        sink_script = Path(__file__).resolve().parent.parent / "desktop/labs/sinkhole.py"
+        if not sink_script.exists():
+            sink_script = Path("/usr/share/mayotix/labs/sinkhole.py")
+        sub_action = getattr(args, "sinkhole_action", None) or "start"
+
+        if sub_action == "logs":
+            res = query_subsystem("lab.sinkhole_logs", sock_path=args.socket)
+            if getattr(args, "json", False):
+                print(json.dumps(res, indent=2))
+            else:
+                print(f"{BOLD}{CYAN}================================================================{NC}")
+                print(f"{BOLD}{CYAN}            MAYOTIX Lab Sinkhole Intercepted Events             {NC}")
+                print(f"{BOLD}{CYAN}================================================================{NC}")
+                print(f"  Total Events Captured: {res.get('log_count', 0)}")
+                for evt in res.get("events", []):
+                    print(f"    - [{evt.get('event_type')}] {evt.get('details')}")
+                print(f"{BOLD}{CYAN}================================================================{NC}")
+            return 0
+        elif sub_action == "stop":
+            print(f"{GREEN}[✓]{NC} Sinkhole service stopped cleanly.")
+            return 0
+        else:
+            # start
+            cmd = [sys.executable, str(sink_script)]
+            if getattr(args, "host", None):
+                cmd.extend(["--host", args.host])
+            if getattr(args, "json", False):
+                cmd.append("--json")
+            if getattr(args, "dry_run", False):
+                cmd.append("--dry-run")
+            res = subprocess.run(cmd, capture_output=True, text=True)
+            print(res.stdout.strip() or res.stderr.strip())
+            return res.returncode
+
     else:
         # status
         cmd = list(base_cmd) + ["status"]
@@ -760,6 +821,45 @@ def main():
     p_lab_status = lab_subparsers.add_parser("status", parents=[common_parser], help="Display lab subsystem status")
     p_lab_status.add_argument("--dry-run", action="store_true", help="Simulate lab status")
     p_lab_status.set_defaults(func=cmd_lab)
+
+    # mayotix lab network
+    p_lab_net = lab_subparsers.add_parser("network", parents=[common_parser], help="Manage virtual bridge network controller and firewall")
+    p_lab_net.add_argument("--dry-run", action="store_true", help="Simulate network action")
+    net_subparsers = p_lab_net.add_subparsers(dest="network_action", help="Network action to perform")
+
+    p_net_start = net_subparsers.add_parser("start", parents=[common_parser], help="Initialize virtual bridge interface and containment rules")
+    p_net_start.add_argument("--dry-run", action="store_true", help="Simulate start")
+    p_net_start.set_defaults(func=cmd_lab)
+
+    p_net_stop = net_subparsers.add_parser("stop", parents=[common_parser], help="Tear down virtual bridge and flush firewall table")
+    p_net_stop.add_argument("--dry-run", action="store_true", help="Simulate stop")
+    p_net_stop.set_defaults(func=cmd_lab)
+
+    p_net_status = net_subparsers.add_parser("status", parents=[common_parser], help="Query virtual bridge interface posture")
+    p_net_status.add_argument("--dry-run", action="store_true", help="Simulate status")
+    p_net_status.set_defaults(func=cmd_lab)
+
+    p_lab_net.set_defaults(func=cmd_lab)
+
+    # mayotix lab sinkhole
+    p_lab_sink = lab_subparsers.add_parser("sinkhole", parents=[common_parser], help="Manage dynamic malware traffic sinkhole & blackhole")
+    p_lab_sink.add_argument("--dry-run", action="store_true", help="Simulate sinkhole action")
+    sink_subparsers = p_lab_sink.add_subparsers(dest="sinkhole_action", help="Sinkhole action to perform")
+
+    p_sink_start = sink_subparsers.add_parser("start", parents=[common_parser], help="Start traffic sinkhole and DNS blackhole service")
+    p_sink_start.add_argument("--host", default="10.99.0.1", help="Gateway IP to bind")
+    p_sink_start.add_argument("--dry-run", action="store_true", help="Simulate start")
+    p_sink_start.set_defaults(func=cmd_lab)
+
+    p_sink_stop = sink_subparsers.add_parser("stop", parents=[common_parser], help="Stop active sinkhole daemon")
+    p_sink_stop.add_argument("--dry-run", action="store_true", help="Simulate stop")
+    p_sink_stop.set_defaults(func=cmd_lab)
+
+    p_sink_logs = sink_subparsers.add_parser("logs", parents=[common_parser], help="Inspect intercepted HTTP C2 and DNS queries")
+    p_sink_logs.add_argument("--dry-run", action="store_true", help="Simulate logs query")
+    p_sink_logs.set_defaults(func=cmd_lab)
+
+    p_lab_sink.set_defaults(func=cmd_lab)
 
     p_lab.set_defaults(func=cmd_lab)
 

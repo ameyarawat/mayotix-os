@@ -13,14 +13,16 @@ require {
     type proc_t;
     type net_conf_t;
     type node_t;
+    type dns_port_t;
+    type http_port_t;
     class file { create read write open execute execute_no_trans unlink getattr entrypoint map };
     class dir { search open read write add_name remove_name getattr rmdir };
     class process { transition siginh rlimitinh noatsecure signal getsched setsched setpgid fork getattr };
     class capability { setuid setgid sys_admin sys_chroot net_admin dac_override };
     class chr_file { read write open getattr ioctl };
     class fifo_file { read write getattr };
-    class udp_socket { create bind setopt getattr read write };
-    class tcp_socket { create bind setopt getattr read write listen accept };
+    class udp_socket { create bind setopt getattr read write name_bind };
+    class tcp_socket { create bind setopt getattr read write listen accept name_bind };
     class netlink_route_socket { create bind read write nlmsg_read nlmsg_write };
 }
 
@@ -46,12 +48,16 @@ allow xdm_t mayotix_labs_exec_t:file { read open execute getattr };
 allow mayotix_labs_t self:capability { setuid setgid sys_admin sys_chroot net_admin dac_override };
 
 # Internal bridge and loopback socket networking
-allow mayotix_labs_t self:udp_socket { create bind setopt getattr read write };
-allow mayotix_labs_t self:tcp_socket { create bind setopt getattr read write listen accept };
+allow mayotix_labs_t self:udp_socket { create bind setopt getattr read write name_bind };
+allow mayotix_labs_t self:tcp_socket { create bind setopt getattr read write listen accept name_bind };
 allow mayotix_labs_t self:netlink_route_socket { create bind read write nlmsg_read nlmsg_write };
 allow mayotix_labs_t net_conf_t:file { read open getattr };
 allow mayotix_labs_t node_t:udp_socket node_bind;
 allow mayotix_labs_t node_t:tcp_socket node_bind;
+
+# Dynamic malware traffic sinkhole & blackhole port bindings (DNS 53, HTTP 80/443)
+allow mayotix_labs_t dns_port_t:udp_socket name_bind;
+allow mayotix_labs_t http_port_t:tcp_socket name_bind;
 
 # System library & interpreter execution
 allow mayotix_labs_t bin_t:file { read open execute execute_no_trans getattr map };

@@ -483,6 +483,72 @@ def handle_lab_status(params):
     except Exception:
         return {"status": "UNKNOWN", "raw": res.stdout.strip()}
 
+def handle_lab_network_start(params):
+    net_script = Path(__file__).resolve().parent.parent / "desktop/labs/lab-network.sh"
+    if not net_script.exists():
+        net_script = Path("/usr/local/sbin/mayotix-lab-network")
+
+    cmd = [str(net_script), "start"]
+    if params.get("dry_run"):
+        cmd.append("--dry-run")
+    res = subprocess.run(cmd, capture_output=True, text=True, timeout=15)
+    return {"success": res.returncode == 0, "output": res.stdout.strip() or res.stderr.strip()}
+
+def handle_lab_network_stop(params):
+    net_script = Path(__file__).resolve().parent.parent / "desktop/labs/lab-network.sh"
+    if not net_script.exists():
+        net_script = Path("/usr/local/sbin/mayotix-lab-network")
+
+    cmd = [str(net_script), "stop"]
+    if params.get("dry_run"):
+        cmd.append("--dry-run")
+    res = subprocess.run(cmd, capture_output=True, text=True, timeout=15)
+    return {"success": res.returncode == 0, "output": res.stdout.strip() or res.stderr.strip()}
+
+def handle_lab_network_status(params):
+    net_script = Path(__file__).resolve().parent.parent / "desktop/labs/lab-network.sh"
+    if not net_script.exists():
+        net_script = Path("/usr/local/sbin/mayotix-lab-network")
+
+    cmd = [str(net_script), "status", "--json"]
+    if params.get("dry_run"):
+        cmd.append("--dry-run")
+    res = subprocess.run(cmd, capture_output=True, text=True, timeout=5)
+    try:
+        return json.loads(res.stdout.strip())
+    except Exception:
+        return {"active": False, "raw": res.stdout.strip()}
+
+def handle_lab_sinkhole_start(params):
+    sink_script = Path(__file__).resolve().parent.parent / "desktop/labs/sinkhole.py"
+    if not sink_script.exists():
+        sink_script = Path("/usr/share/mayotix/labs/sinkhole.py")
+
+    cmd = [sys.executable, str(sink_script), "--json"]
+    if params.get("host"):
+        cmd.extend(["--host", str(params["host"])])
+    if params.get("dry_run"):
+        cmd.append("--dry-run")
+    res = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
+    try:
+        return json.loads(res.stdout.strip())
+    except Exception:
+        return {"status": "UNKNOWN", "raw": res.stdout.strip()}
+
+def handle_lab_sinkhole_stop(params):
+    return {"success": True, "action": "sinkhole_stop", "status": "STOPPED"}
+
+def handle_lab_sinkhole_logs(params):
+    log_file = Path("/var/log/mayotix/labs/sinkhole.log")
+    lines = []
+    if log_file.exists():
+        try:
+            with open(log_file, "r", encoding="utf-8") as f:
+                lines = [json.loads(line) for line in f.readlines()[-50:] if line.strip()]
+        except Exception:
+            pass
+    return {"log_count": len(lines), "events": lines}
+
 def handle_incident_triage(params):
     triage_script = Path(__file__).resolve().parent.parent / "desktop/defender/incident/triage-snapshot.sh"
     if not triage_script.exists():
@@ -540,6 +606,12 @@ RPC_METHODS = {
     "lab.list": lambda params: handle_lab_list(params),
     "lab.destroy": lambda params: handle_lab_destroy(params),
     "lab.status": lambda params: handle_lab_status(params),
+    "lab.network_start": lambda params: handle_lab_network_start(params),
+    "lab.network_stop": lambda params: handle_lab_network_stop(params),
+    "lab.network_status": lambda params: handle_lab_network_status(params),
+    "lab.sinkhole_start": lambda params: handle_lab_sinkhole_start(params),
+    "lab.sinkhole_stop": lambda params: handle_lab_sinkhole_stop(params),
+    "lab.sinkhole_logs": lambda params: handle_lab_sinkhole_logs(params),
     "incident.triage": lambda params: handle_incident_triage(params),
     "incident.report": lambda params: handle_incident_report(params),
     "ping": lambda params: "pong"
