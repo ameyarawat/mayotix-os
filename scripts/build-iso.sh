@@ -95,7 +95,7 @@ user --name=mayotix --groups=wheel --plaintext --password=mayotix --gecos="MAYOT
 # Partitioning — simple layout for live image build filesystem
 zerombr
 clearpart --all
-autopart --type=plain --nohome
+part / --fstype=ext4 --size=8192
 
 # Shutdown after build (required by livemedia-creator)
 shutdown
