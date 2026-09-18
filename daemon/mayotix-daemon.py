@@ -977,6 +977,77 @@ def handle_installer_simulate(params):
     args.extend(["--dry-run", "--json"])
     return _run_installer_script("mayotix-installer.sh", args)
 
+def _run_pentest_tool(tool_name, args, timeout=30):
+    script_path = Path(__file__).resolve().parent.parent / f"tests/pentest/{tool_name}"
+    if not script_path.exists():
+        script_path = Path(f"/usr/local/share/mayotix/pentest/{tool_name}")
+    
+    if tool_name.endswith(".py"):
+        cmd = [sys.executable, str(script_path)] + args
+    else:
+        cmd = [str(script_path)] + args
+        if sys.platform == "win32":
+            for git_bash in [
+                r"C:\Program Files\Git\bin\bash.exe",
+                r"C:\Program Files\Git\usr\bin\bash.exe",
+            ]:
+                if os.path.exists(git_bash):
+                    cmd = [git_bash, str(script_path)] + args
+                    break
+        elif not os.access(str(script_path), os.X_OK):
+            cmd = ["/bin/bash", str(script_path)] + args
+
+    res = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
+    try:
+        return json.loads(res.stdout.strip())
+    except Exception:
+        return {"status": "SUCCESS" if res.returncode == 0 else "ERROR", "raw": res.stdout.strip() or res.stderr.strip()}
+
+def handle_pentest_privesc(params):
+    args = ["scan", "--json"]
+    if params.get("dry_run"):
+        args.append("--dry-run")
+    return _run_pentest_tool("privesc-check.sh", args)
+
+def handle_pentest_sandbox_escape(params):
+    args = ["run-all", "--json"]
+    if params.get("dry_run"):
+        args.append("--dry-run")
+    return _run_pentest_tool("sandbox-escape.sh", args)
+
+def handle_pentest_fuzz(params):
+    args = ["run", "--json"]
+    if params.get("dry_run"):
+        args.append("--dry-run")
+    return _run_pentest_tool("injection-fuzzer.py", args)
+
+def handle_pentest_network_audit(params):
+    args = ["audit", "--json"]
+    if params.get("dry_run"):
+        args.append("--dry-run")
+    return _run_pentest_tool("network-exposure.sh", args)
+
+def handle_pentest_report(params):
+    priv = handle_pentest_privesc(params)
+    sbx = handle_pentest_sandbox_escape(params)
+    fuzz = handle_pentest_fuzz(params)
+    net = handle_pentest_network_audit(params)
+    
+    overall_status = "PASS"
+    for res in [priv, sbx, fuzz, net]:
+        if isinstance(res, dict) and res.get("status") in ["FAIL", "ERROR"]:
+            overall_status = "FAIL"
+            
+    return {
+        "status": overall_status,
+        "timestamp": time.time(),
+        "suite": "MAYOTIX Automated Penetration Testing & Hardening Suite",
+        "privilege_escalation": priv,
+        "sandbox_escape": sbx,
+        "injection_fuzzing": fuzz,
+        "network_exposure": net
+    }
+
 # ==============================================================================
 # 3. JSON-RPC Protocol Dispatcher
 # ==============================================================================
@@ -1032,6 +1103,11 @@ RPC_METHODS = {
     "installer.validate_layout": lambda params: handle_installer_validate_layout(params),
     "installer.luks_status": lambda params: handle_installer_luks_status(params),
     "installer.simulate": lambda params: handle_installer_simulate(params),
+    "pentest.privesc": lambda params: handle_pentest_privesc(params),
+    "pentest.sandbox_escape": lambda params: handle_pentest_sandbox_escape(params),
+    "pentest.fuzz": lambda params: handle_pentest_fuzz(params),
+    "pentest.network_audit": lambda params: handle_pentest_network_audit(params),
+    "pentest.report": lambda params: handle_pentest_report(params),
     "incident.triage": lambda params: handle_incident_triage(params),
     "incident.report": lambda params: handle_incident_report(params),
     "ping": lambda params: "pong"

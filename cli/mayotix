@@ -923,6 +923,74 @@ def cmd_install(args):
             extra.append("--dry-run")
         return _call_installer_script("mayotix-installer.sh", ["preflight"] + extra)
 
+def cmd_pentest(args):
+    """Executes automated penetration testing, privilege escalation audits, and fuzzing."""
+    action = getattr(args, "pentest_action", None) or "run-all"
+    dry_run = getattr(args, "dry_run", False)
+    json_out = getattr(args, "json", False)
+
+    def _call_pentest_tool(script_name, script_args):
+        script_path = Path(__file__).resolve().parent.parent / f"tests/pentest/{script_name}"
+        if not script_path.exists():
+            script_path = Path(f"/usr/local/share/mayotix/pentest/{script_name}")
+        
+        if script_name.endswith(".py"):
+            cmd = [sys.executable, str(script_path)] + script_args
+        else:
+            cmd = [str(script_path)] + script_args
+            if sys.platform == "win32":
+                for git_bash in [
+                    r"C:\Program Files\Git\bin\bash.exe",
+                    r"C:\Program Files\Git\usr\bin\bash.exe",
+                ]:
+                    if os.path.exists(git_bash):
+                        cmd = [git_bash, str(script_path)] + script_args
+                        break
+            elif not os.access(str(script_path), os.X_OK):
+                cmd = ["/bin/bash", str(script_path)] + script_args
+
+        res = subprocess.run(cmd, capture_output=True, text=True)
+        print(res.stdout.strip() or res.stderr.strip())
+        return res.returncode
+
+    extra = []
+    if json_out:
+        extra.append("--json")
+    if dry_run:
+        extra.append("--dry-run")
+
+    if action == "privesc":
+        return _call_pentest_tool("privesc-check.sh", ["scan"] + extra)
+
+    elif action == "sandbox":
+        return _call_pentest_tool("sandbox-escape.sh", ["run-all"] + extra)
+
+    elif action == "fuzz":
+        return _call_pentest_tool("injection-fuzzer.py", ["run"] + extra)
+
+    elif action == "network":
+        return _call_pentest_tool("network-exposure.sh", ["audit"] + extra)
+
+    elif action in ["run-all", "report"]:
+        if json_out:
+            return _call_pentest_tool("privesc-check.sh", ["scan"] + extra)
+        else:
+            print("================================================================================")
+            print("         MAYOTIX OS AUTOMATED PENETRATION TESTING & HARDENING SUITE             ")
+            print("================================================================================")
+            _call_pentest_tool("privesc-check.sh", ["scan"] + extra)
+            print("--------------------------------------------------------------------------------")
+            _call_pentest_tool("sandbox-escape.sh", ["run-all"] + extra)
+            print("--------------------------------------------------------------------------------")
+            _call_pentest_tool("injection-fuzzer.py", ["run"] + extra)
+            print("--------------------------------------------------------------------------------")
+            _call_pentest_tool("network-exposure.sh", ["audit"] + extra)
+            print("================================================================================")
+            return 0
+
+    else:
+        return _call_pentest_tool("privesc-check.sh", ["scan"] + extra)
+
 def cmd_version(args):
     ver = {
         "name": "MAYOTIX OS",
@@ -1288,6 +1356,37 @@ def main():
     p_inst_start.set_defaults(func=cmd_install)
 
     p_install.set_defaults(func=cmd_install)
+
+    # mayotix pentest
+    p_pentest = subparsers.add_parser("pentest", parents=[common_parser], help="Execute automated penetration testing, privilege escalation checks, and fuzzing")
+    p_pentest.add_argument("--dry-run", action="store_true", help="Simulate penetration testing actions")
+    pentest_subparsers = p_pentest.add_subparsers(dest="pentest_action", help="Penetration testing action to perform")
+
+    p_pt_priv = pentest_subparsers.add_parser("privesc", parents=[common_parser], help="Audit SUID/SGID, sudoers wildcards, capability leaks, and kernel sysctls")
+    p_pt_priv.add_argument("--dry-run", action="store_true", help="Simulate privesc scan")
+    p_pt_priv.set_defaults(func=cmd_pentest)
+
+    p_pt_sbx = pentest_subparsers.add_parser("sandbox", parents=[common_parser], help="Test sandbox escape defenses (cgroupv2, bwrap, flatpak, dbus, seccomp)")
+    p_pt_sbx.add_argument("--dry-run", action="store_true", help="Simulate sandbox escape tests")
+    p_pt_sbx.set_defaults(func=cmd_pentest)
+
+    p_pt_fuzz = pentest_subparsers.add_parser("fuzz", parents=[common_parser], help="Fuzz CLI and daemon input validation against injection attacks")
+    p_pt_fuzz.add_argument("--dry-run", action="store_true", help="Simulate injection fuzzing")
+    p_pt_fuzz.set_defaults(func=cmd_pentest)
+
+    p_pt_net = pentest_subparsers.add_parser("network", parents=[common_parser], help="Audit network exposure, open listening sockets, stealth drops, and killswitch")
+    p_pt_net.add_argument("--dry-run", action="store_true", help="Simulate network exposure audit")
+    p_pt_net.set_defaults(func=cmd_pentest)
+
+    p_pt_all = pentest_subparsers.add_parser("run-all", parents=[common_parser], help="Execute full penetration testing and hardening test battery")
+    p_pt_all.add_argument("--dry-run", action="store_true", help="Simulate full test suite")
+    p_pt_all.set_defaults(func=cmd_pentest)
+
+    p_pt_rep = pentest_subparsers.add_parser("report", parents=[common_parser], help="Generate comprehensive penetration testing security report")
+    p_pt_rep.add_argument("--dry-run", action="store_true", help="Simulate report generation")
+    p_pt_rep.set_defaults(func=cmd_pentest)
+
+    p_pentest.set_defaults(func=cmd_pentest)
 
     # mayotix version
     p_ver = subparsers.add_parser("version", parents=[common_parser], help="Display version and release information")
