@@ -1,0 +1,10 @@
+[Desktop Entry]
+Name=MAYOTIX Defender
+Comment=Network Packet Inspection, PCAP Analysis & Forensic Security Lab
+Exec=python3 /usr/share/mayotix/defender/mayotix-defender-gui.py
+Icon=security-high
+Terminal=false
+Type=Application
+Categories=System;Security;Network;
+StartupNotify=true
+Keywords=security;packet;capture;wireshark;firewall;defender;forensics;

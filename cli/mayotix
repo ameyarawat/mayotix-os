@@ -530,6 +530,7 @@ def main():
 
     # mayotix capture
     p_cap = subparsers.add_parser("capture", parents=[common_parser], help="Manage defender live packet captures and security sniffing")
+    p_cap.add_argument("--dry-run", action="store_true", help="Simulate capture status/operation")
     cap_subparsers = p_cap.add_subparsers(dest="capture_action", help="Capture action to perform")
 
     p_cap_start = cap_subparsers.add_parser("start", parents=[common_parser], help="Start packet capture session")
@@ -552,6 +553,32 @@ def main():
     p_cap_profiles.set_defaults(func=cmd_capture)
 
     p_cap.set_defaults(func=cmd_capture)
+
+    # mayotix pcap
+    p_pcap = subparsers.add_parser("pcap", parents=[common_parser], help="Automated PCAP threat analysis and sandboxed dissection")
+    p_pcap.add_argument("--dry-run", action="store_true", help="Simulate PCAP operation")
+    pcap_subparsers = p_pcap.add_subparsers(dest="pcap_action", help="PCAP action to perform")
+
+    p_pcap_scan = pcap_subparsers.add_parser("scan", parents=[common_parser], help="Automated threat & security heuristic scan")
+    p_pcap_scan.add_argument("pcap_file", nargs="?", default="", help="Path to PCAP file")
+    p_pcap_scan.add_argument("--dry-run", action="store_true", help="Simulate threat analysis on mock capture")
+    p_pcap_scan.set_defaults(func=cmd_analyze)
+
+    p_pcap_analyze = pcap_subparsers.add_parser("analyze", parents=[common_parser], help="Alias for pcap scan")
+    p_pcap_analyze.add_argument("pcap_file", nargs="?", default="", help="Path to PCAP file")
+    p_pcap_analyze.add_argument("--dry-run", action="store_true", help="Simulate analyze")
+    p_pcap_analyze.set_defaults(func=cmd_analyze)
+
+    p_pcap_dissect = pcap_subparsers.add_parser("dissect", parents=[common_parser], help="Sandboxed dissection")
+    p_pcap_dissect.add_argument("pcap_file", nargs="?", default="", help="Path to PCAP file")
+    p_pcap_dissect.add_argument("-s", "--summary", action="store_true", help="Display packet summary")
+    p_pcap_dissect.add_argument("-f", "--filter", help="Filter expression")
+    p_pcap_dissect.add_argument("-t", "--tool", default="tshark", help="Tool")
+    p_pcap_dissect.add_argument("-c", "--count", type=int, help="Packet count")
+    p_pcap_dissect.add_argument("--dry-run", action="store_true", help="Simulate sandboxed dissection")
+    p_pcap_dissect.set_defaults(func=cmd_dissect)
+
+    p_pcap.set_defaults(func=cmd_analyze)
 
     # mayotix analyze
     p_ana = subparsers.add_parser("analyze", parents=[common_parser], help="Automated threat & security heuristic analysis of PCAP capture")

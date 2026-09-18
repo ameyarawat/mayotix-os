@@ -265,7 +265,160 @@ def set_killswitch_state(state):
     }
 
 # ==============================================================================
-# 2. JSON-RPC Protocol Dispatcher
+# 2. Defender & Forensics RPC Handlers
+# ==============================================================================
+
+def handle_capture_start(params):
+    capture_script = Path(__file__).resolve().parent.parent / "desktop/defender/mayotix-capture.sh"
+    if not capture_script.exists():
+        capture_script = Path("/usr/local/sbin/mayotix-capture")
+
+    allowed_profiles = {"wireguard-egress", "dot-dns", "leak-sniffer", "custom"}
+    profile = params.get("profile", "wireguard-egress")
+    if profile not in allowed_profiles:
+        return {"success": False, "error": f"Profile '{profile}' not in allowed_profiles"}
+
+    cmd = [str(capture_script), "start"]
+    if params.get("interface"):
+        cmd.extend(["--interface", str(params["interface"])])
+    if params.get("profile"):
+        cmd.extend(["--profile", str(params["profile"])])
+    if params.get("filter"):
+        cmd.extend(["--filter", str(params["filter"])])
+    if params.get("output"):
+        cmd.extend(["--output", str(params["output"])])
+    if params.get("dry_run"):
+        cmd.append("--dry-run")
+
+    res = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
+    return {"success": res.returncode == 0, "output": res.stdout.strip() or res.stderr.strip()}
+
+def handle_capture_stop(params):
+    capture_script = Path(__file__).resolve().parent.parent / "desktop/defender/mayotix-capture.sh"
+    if not capture_script.exists():
+        capture_script = Path("/usr/local/sbin/mayotix-capture")
+
+    cmd = [str(capture_script), "stop"]
+    if params.get("dry_run"):
+        cmd.append("--dry-run")
+    res = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
+    return {"success": res.returncode == 0, "output": res.stdout.strip() or res.stderr.strip()}
+
+def handle_capture_status(params):
+    capture_script = Path(__file__).resolve().parent.parent / "desktop/defender/mayotix-capture.sh"
+    if not capture_script.exists():
+        capture_script = Path("/usr/local/sbin/mayotix-capture")
+
+    cmd = [str(capture_script), "status", "--json"]
+    if params.get("dry_run"):
+        cmd.append("--dry-run")
+    res = subprocess.run(cmd, capture_output=True, text=True, timeout=5)
+    try:
+        return json.loads(res.stdout.strip())
+    except Exception:
+        return {"active": False, "raw": res.stdout.strip()}
+
+def handle_capture_list_profiles(params):
+    return [
+        {"id": "wireguard-egress", "description": "Captures encapsulated VPN traffic on wg* or UDP/51820"},
+        {"id": "dot-dns", "description": "Captures system-wide DNS-over-TLS packets on port 853"},
+        {"id": "leak-sniffer", "description": "Detects cleartext unencrypted egress leaks on physical interfaces"},
+        {"id": "custom", "description": "Arbitrary BPF packet capture filter expression"}
+    ]
+
+def handle_pcap_analyze(params):
+    scan_script = Path(__file__).resolve().parent.parent / "desktop/defender/scan-pcap.py"
+    if not scan_script.exists():
+        scan_script = Path("/usr/share/mayotix/defender/scan-pcap.py")
+
+    cmd = [sys.executable, str(scan_script), "--json"]
+    if params.get("filepath"):
+        cmd.append(str(params["filepath"]))
+    if params.get("dry_run"):
+        cmd.append("--dry-run")
+    res = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+    try:
+        return json.loads(res.stdout.strip())
+    except Exception:
+        return {"error": "Failed to parse analysis output", "raw": res.stdout.strip()}
+
+def handle_pcap_dissect(params):
+    dissect_script = Path(__file__).resolve().parent.parent / "desktop/defender/dissect-pcap.sh"
+    if not dissect_script.exists():
+        dissect_script = Path("/usr/local/sbin/mayotix-dissect")
+
+    # Parameter validation for dissector sandbox execution
+    allowed_tools = {"tshark", "tcpdump"}
+    tool = params.get("tool", "tshark")
+    if tool not in allowed_tools:
+        return {"success": False, "error": f"Tool '{tool}' not permitted for dissector sandbox"}
+
+    cmd = [str(dissect_script)]
+    if params.get("filepath"):
+        cmd.append(str(params["filepath"]))
+    if params.get("summary"):
+        cmd.append("--summary")
+    if params.get("filter"):
+        cmd.extend(["--filter", str(params["filter"])])
+    if params.get("count"):
+        cmd.extend(["--count", str(params["count"])])
+    if params.get("dry_run"):
+        cmd.append("--dry-run")
+    res = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+    return {"success": res.returncode == 0, "output": res.stdout.strip() or res.stderr.strip()}
+
+def handle_forensic_dump(params):
+    dump_script = Path(__file__).resolve().parent.parent / "desktop/defender/forensics/dump-process.sh"
+    if not dump_script.exists():
+        dump_script = Path("/usr/local/sbin/mayotix-dump")
+
+    pid = params.get("pid", 1)
+    cmd = [str(dump_script), "--pid", str(pid)]
+    if params.get("output"):
+        cmd.extend(["--output", str(params["output"])])
+    if params.get("sanitize"):
+        cmd.append("--sanitize")
+    if params.get("dry_run"):
+        cmd.append("--dry-run")
+    res = subprocess.run(cmd, capture_output=True, text=True, timeout=15)
+    return {"success": res.returncode == 0, "output": res.stdout.strip() or res.stderr.strip()}
+
+def handle_forensic_sanitize(params):
+    san_script = Path(__file__).resolve().parent.parent / "desktop/defender/forensics/sanitize-dump.py"
+    if not san_script.exists():
+        san_script = Path("/usr/share/mayotix/defender/forensics/sanitize-dump.py")
+
+    cmd = [sys.executable, str(san_script), "--json"]
+    if params.get("input_file"):
+        cmd.append(str(params["input_file"]))
+    if params.get("output"):
+        cmd.extend(["--output", str(params["output"])])
+    if params.get("dry_run"):
+        cmd.append("--dry-run")
+    res = subprocess.run(cmd, capture_output=True, text=True, timeout=15)
+    try:
+        return json.loads(res.stdout.strip())
+    except Exception:
+        return {"error": "Failed to parse sanitize output", "raw": res.stdout.strip()}
+
+def handle_monitor_scan(params):
+    mon_script = Path(__file__).resolve().parent.parent / "desktop/defender/monitor/threat-monitor.py"
+    if not mon_script.exists():
+        mon_script = Path("/usr/share/mayotix/defender/monitor/threat-monitor.py")
+
+    cmd = [sys.executable, str(mon_script), "--json"]
+    if params.get("threats_only"):
+        cmd.append("--threats-only")
+    if params.get("dry_run"):
+        cmd.append("--dry-run")
+    res = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
+    try:
+        return json.loads(res.stdout.strip())
+    except Exception:
+        return {"error": "Failed to parse monitor output", "raw": res.stdout.strip()}
+
+# ==============================================================================
+# 3. JSON-RPC Protocol Dispatcher
 # ==============================================================================
 
 RPC_METHODS = {
@@ -274,6 +427,15 @@ RPC_METHODS = {
     "network.get": lambda params: get_network_status(),
     "firewall.get": lambda params: get_firewall_status(),
     "firewall.set_killswitch": lambda params: set_killswitch_state(params.get("state", "enable")),
+    "capture.start": lambda params: handle_capture_start(params),
+    "capture.stop": lambda params: handle_capture_stop(params),
+    "capture.status": lambda params: handle_capture_status(params),
+    "capture.list_profiles": lambda params: handle_capture_list_profiles(params),
+    "pcap.analyze": lambda params: handle_pcap_analyze(params),
+    "pcap.dissect": lambda params: handle_pcap_dissect(params),
+    "forensic.dump": lambda params: handle_forensic_dump(params),
+    "forensic.sanitize": lambda params: handle_forensic_sanitize(params),
+    "monitor.scan": lambda params: handle_monitor_scan(params),
     "ping": lambda params: "pong"
 }
 
