@@ -659,6 +659,63 @@ def cmd_lab(args):
         print(res.stdout.strip() or res.stderr.strip())
         return res.returncode
 
+def cmd_vm(args):
+    """Executes hardware-assisted KVM micro-VM and topology actions."""
+    vm_script = Path(__file__).resolve().parent.parent / "desktop/labs/vm/mayotix-vm.sh"
+    if not vm_script.exists():
+        vm_script = Path("/usr/local/sbin/mayotix-vm")
+    vm_cmd = [str(vm_script)]
+    if sys.platform == "win32":
+        for git_bash in [r"C:\Program Files\Git\bin\bash.exe", r"C:\Program Files\Git\usr\bin\bash.exe"]:
+            if os.path.exists(git_bash):
+                vm_cmd = [git_bash, str(vm_script)]
+                break
+    elif not os.access(str(vm_script), os.X_OK):
+        vm_cmd = ["/bin/bash", str(vm_script)]
+
+    action = getattr(args, "vm_action", None) or "status"
+
+    if action == "topology":
+        top_script = Path(__file__).resolve().parent.parent / "desktop/labs/vm/lab-topology.py"
+        if not top_script.exists():
+            top_script = Path("/usr/share/mayotix/labs/vm/lab-topology.py")
+        top_action = getattr(args, "top_action", None) or "list"
+        cmd = [sys.executable, str(top_script), top_action]
+        if top_action in ["deploy", "teardown"]:
+            scenario = getattr(args, "scenario", None) or "malware-sandbox"
+            cmd.append(scenario)
+        if getattr(args, "json", False):
+            cmd.append("--json")
+        if getattr(args, "dry_run", False):
+            cmd.append("--dry-run")
+        res = subprocess.run(cmd, capture_output=True, text=True)
+        print(res.stdout.strip() or res.stderr.strip())
+        return res.returncode
+
+    cmd = list(vm_cmd) + [action]
+    if getattr(args, "vm_name", None):
+        cmd.append(args.vm_name)
+    if getattr(args, "snapshot_name", None):
+        cmd.append(args.snapshot_name)
+    if getattr(args, "template", None):
+        cmd.extend(["--template", str(args.template)])
+    if getattr(args, "ram", None):
+        cmd.extend(["--ram", str(args.ram)])
+    if getattr(args, "cpus", None):
+        cmd.extend(["--cpus", str(args.cpus)])
+    if getattr(args, "net", None):
+        cmd.extend(["--net", str(args.net)])
+    if getattr(args, "json", False):
+        cmd.append("--json")
+    if getattr(args, "dry_run", False):
+        cmd.append("--dry-run")
+    if getattr(args, "force", False):
+        cmd.append("--force")
+
+    res = subprocess.run(cmd, capture_output=True, text=True)
+    print(res.stdout.strip() or res.stderr.strip())
+    return res.returncode
+
 def cmd_incident(args):
     """Executes automated incident response triage and reporting."""
     triage_script = Path(__file__).resolve().parent.parent / "desktop/defender/incident/triage-snapshot.sh"
@@ -950,6 +1007,59 @@ def main():
     p_inc_report.set_defaults(func=cmd_incident)
 
     p_inc.set_defaults(func=cmd_incident)
+
+    # mayotix vm
+    p_vm = subparsers.add_parser("vm", parents=[common_parser], help="Manage hardware-assisted KVM micro-VMs and lab topologies")
+    p_vm.add_argument("--dry-run", action="store_true", help="Simulate VM action")
+    vm_subparsers = p_vm.add_subparsers(dest="vm_action", help="VM action to perform")
+
+    p_vm_launch = vm_subparsers.add_parser("launch", parents=[common_parser], help="Launch a micro-VM instance")
+    p_vm_launch.add_argument("vm_name", nargs="?", default="lab-vm-01", help="VM identifier")
+    p_vm_launch.add_argument("-t", "--template", default="malware", help="VM template (malware, attack-defense, forensics)")
+    p_vm_launch.add_argument("-m", "--ram", type=int, default=2048, help="RAM in MB")
+    p_vm_launch.add_argument("-c", "--cpus", type=int, default=2, help="vCPUs")
+    p_vm_launch.add_argument("-n", "--net", default="isolated", help="Network mode (isolated, sinkhole, dual-homed)")
+    p_vm_launch.add_argument("--dry-run", action="store_true", help="Simulate launch")
+    p_vm_launch.set_defaults(func=cmd_vm)
+
+    p_vm_stop = vm_subparsers.add_parser("stop", parents=[common_parser], help="Stop a micro-VM instance")
+    p_vm_stop.add_argument("vm_name", nargs="?", default="lab-vm-01", help="VM identifier")
+    p_vm_stop.add_argument("-f", "--force", action="store_true", help="Force stop")
+    p_vm_stop.add_argument("--dry-run", action="store_true", help="Simulate stop")
+    p_vm_stop.set_defaults(func=cmd_vm)
+
+    p_vm_list = vm_subparsers.add_parser("list", parents=[common_parser], help="List registered micro-VMs")
+    p_vm_list.add_argument("--dry-run", action="store_true", help="Simulate list")
+    p_vm_list.set_defaults(func=cmd_vm)
+
+    p_vm_destroy = vm_subparsers.add_parser("destroy", parents=[common_parser], help="Destroy a micro-VM instance")
+    p_vm_destroy.add_argument("vm_name", nargs="?", default="lab-vm-01", help="VM identifier")
+    p_vm_destroy.add_argument("--dry-run", action="store_true", help="Simulate destroy")
+    p_vm_destroy.set_defaults(func=cmd_vm)
+
+    p_vm_status = vm_subparsers.add_parser("status", parents=[common_parser], help="Display hypervisor status")
+    p_vm_status.add_argument("--dry-run", action="store_true", help="Simulate status")
+    p_vm_status.set_defaults(func=cmd_vm)
+
+    p_vm_snap = vm_subparsers.add_parser("snapshot", parents=[common_parser], help="Create instant QCOW2 snapshot")
+    p_vm_snap.add_argument("vm_name", nargs="?", default="lab-vm-01", help="VM identifier")
+    p_vm_snap.add_argument("snapshot_name", nargs="?", default="snap-01", help="Snapshot name")
+    p_vm_snap.add_argument("--dry-run", action="store_true", help="Simulate snapshot")
+    p_vm_snap.set_defaults(func=cmd_vm)
+
+    p_vm_roll = vm_subparsers.add_parser("rollback", parents=[common_parser], help="Rollback micro-VM to snapshot")
+    p_vm_roll.add_argument("vm_name", nargs="?", default="lab-vm-01", help="VM identifier")
+    p_vm_roll.add_argument("snapshot_name", nargs="?", default="base", help="Target snapshot name")
+    p_vm_roll.add_argument("--dry-run", action="store_true", help="Simulate rollback")
+    p_vm_roll.set_defaults(func=cmd_vm)
+
+    p_vm_top = vm_subparsers.add_parser("topology", parents=[common_parser], help="Manage multi-node lab topologies")
+    p_vm_top.add_argument("top_action", nargs="?", default="list", choices=["deploy", "list", "teardown", "status"], help="Topology action")
+    p_vm_top.add_argument("scenario", nargs="?", default=None, help="Scenario name")
+    p_vm_top.add_argument("--dry-run", action="store_true", help="Simulate topology")
+    p_vm_top.set_defaults(func=cmd_vm)
+
+    p_vm.set_defaults(func=cmd_vm)
 
     # mayotix version
     p_ver = subparsers.add_parser("version", parents=[common_parser], help="Display version and release information")

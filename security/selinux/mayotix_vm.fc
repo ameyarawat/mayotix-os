@@ -1,0 +1,4 @@
+/usr/local/sbin/mayotix-vm            -- gen_context(system_u:object_r:mayotix_vm_exec_t,s0)
+/usr/share/mayotix/labs/vm/.*\.sh     -- gen_context(system_u:object_r:mayotix_vm_exec_t,s0)
+/var/lib/mayotix/vms(/.*)?               gen_context(system_u:object_r:mayotix_vm_image_t,s0)
+/var/log/mayotix/vms(/.*)?               gen_context(system_u:object_r:mayotix_vm_log_t,s0)
