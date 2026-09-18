@@ -765,6 +765,85 @@ def cmd_incident(args):
 
     return 0
 
+def cmd_game(args):
+    """Executes hardened gaming, GameMode, GPU optimization, and Proton actions."""
+    action = getattr(args, "game_action", None) or "status"
+    dry_run = getattr(args, "dry_run", False)
+    json_out = getattr(args, "json", False)
+
+    def _call_gaming_script(script_name, script_args):
+        script_path = Path(__file__).resolve().parent.parent / f"desktop/gaming/{script_name}"
+        if not script_path.exists():
+            script_path = Path(f"/usr/local/bin/{script_name}")
+        cmd = [str(script_path)] + script_args
+        if sys.platform == "win32":
+            for git_bash in [
+                r"C:\Program Files\Git\bin\bash.exe",
+                r"C:\Program Files\Git\usr\bin\bash.exe",
+            ]:
+                if os.path.exists(git_bash):
+                    cmd = [git_bash, str(script_path)] + script_args
+                    break
+        elif not os.access(str(script_path), os.X_OK):
+            cmd = ["/bin/bash", str(script_path)] + script_args
+        res = subprocess.run(cmd, capture_output=True, text=True)
+        print(res.stdout.strip() or res.stderr.strip())
+        return res.returncode
+
+    if action == "optimize":
+        sub = getattr(args, "opt_subcommand", None) or "status"
+        extra = []
+        if getattr(args, "pid", None):
+            extra.append(str(args.pid))
+        if json_out:
+            extra.append("--json")
+        if dry_run:
+            extra.append("--dry-run")
+        return _call_gaming_script("mayotix-gamemode.sh", [sub] + extra)
+
+    elif action == "gpu":
+        extra = []
+        if json_out:
+            extra.append("--json")
+        if dry_run:
+            extra.append("--dry-run")
+        return _call_gaming_script("gpu-optimizer.sh", ["status"] + extra)
+
+    elif action == "proton":
+        sub = getattr(args, "proton_subcommand", None) or "status"
+        extra = []
+        if json_out:
+            extra.append("--json")
+        if dry_run:
+            extra.append("--dry-run")
+        return _call_gaming_script("proton-runner.sh", [sub] + extra)
+
+    elif action == "anticheat":
+        extra = []
+        if json_out:
+            extra.append("--json")
+        if dry_run:
+            extra.append("--dry-run")
+        return _call_gaming_script("proton-runner.sh", ["anticheat-check"] + extra)
+
+    elif action == "launch":
+        app = getattr(args, "app", None) or "steam"
+        extra = []
+        if json_out:
+            extra.append("--json")
+        if dry_run:
+            extra.append("--dry-run")
+        return _call_gaming_script("steam-launcher.sh", ["launch", app] + extra)
+
+    else:
+        # Default: status
+        extra = []
+        if json_out:
+            extra.append("--json")
+        if dry_run:
+            extra.append("--dry-run")
+        return _call_gaming_script("mayotix-gamemode.sh", ["status"] + extra)
+
 def cmd_version(args):
     ver = {
         "name": "MAYOTIX OS",
@@ -1060,6 +1139,41 @@ def main():
     p_vm_top.set_defaults(func=cmd_vm)
 
     p_vm.set_defaults(func=cmd_vm)
+
+    # mayotix game
+    p_game = subparsers.add_parser("game", parents=[common_parser], help="Manage hardened gaming, GameMode, GPU optimization, and Proton runtimes")
+    p_game.add_argument("--dry-run", action="store_true", help="Simulate gaming action")
+    game_subparsers = p_game.add_subparsers(dest="game_action", help="Gaming action to perform")
+
+    p_game_status = game_subparsers.add_parser("status", parents=[common_parser], help="Display GameMode and GPU acceleration status")
+    p_game_status.add_argument("--dry-run", action="store_true", help="Simulate status")
+    p_game_status.set_defaults(func=cmd_game)
+
+    p_game_opt = game_subparsers.add_parser("optimize", parents=[common_parser], help="Control GameMode latency and CPU governor optimization")
+    p_game_opt.add_argument("opt_subcommand", nargs="?", default="status", choices=["start", "stop", "status", "toggle"], help="Optimization action")
+    p_game_opt.add_argument("--pid", type=int, help="Target process PID to optimize")
+    p_game_opt.add_argument("--dry-run", action="store_true", help="Simulate optimization")
+    p_game_opt.set_defaults(func=cmd_game)
+
+    p_game_gpu = game_subparsers.add_parser("gpu", parents=[common_parser], help="Probe GPU drivers, Vulkan ICDs, and shader caches")
+    p_game_gpu.add_argument("--dry-run", action="store_true", help="Simulate GPU probe")
+    p_game_gpu.set_defaults(func=cmd_game)
+
+    p_game_proton = game_subparsers.add_parser("proton", parents=[common_parser], help="Inspect Proton / Wine compatibility runtimes")
+    p_game_proton.add_argument("proton_subcommand", nargs="?", default="status", choices=["status", "list"], help="Proton action")
+    p_game_proton.add_argument("--dry-run", action="store_true", help="Simulate Proton query")
+    p_game_proton.set_defaults(func=cmd_game)
+
+    p_game_anticheat = game_subparsers.add_parser("anticheat", parents=[common_parser], help="Audit anti-cheat compatibility and security risks")
+    p_game_anticheat.add_argument("--dry-run", action="store_true", help="Simulate anti-cheat audit")
+    p_game_anticheat.set_defaults(func=cmd_game)
+
+    p_game_launch = game_subparsers.add_parser("launch", parents=[common_parser], help="Launch application inside sandboxed gaming container")
+    p_game_launch.add_argument("app", nargs="?", default="steam", help="Application or game binary name")
+    p_game_launch.add_argument("--dry-run", action="store_true", help="Simulate sandboxed launch")
+    p_game_launch.set_defaults(func=cmd_game)
+
+    p_game.set_defaults(func=cmd_game)
 
     # mayotix version
     p_ver = subparsers.add_parser("version", parents=[common_parser], help="Display version and release information")

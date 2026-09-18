@@ -1,0 +1,88 @@
+policy_module(mayotix_gaming, 1.0.0)
+
+###############################################################################
+# MAYOTIX OS — Phase 10: Hardened Gaming Subsystem SELinux Type Enforcement
+# File: security/selinux/mayotix_gaming.te
+# Description: Confines gaming runtimes (Steam, Proton, DXVK, Wine) within
+#              mayotix_gaming_t with GPU/Vulkan, audio, and Wayland access,
+#              while enforcing an absolute host airgap (zero user_home_t access).
+###############################################################################
+
+require {
+    type dri_device_t;
+    type sound_device_t;
+    type devpts_t;
+    type tmp_t;
+    type node_t;
+    type netif_t;
+    type port_t;
+    class chr_file { open read write ioctl map getattr append };
+    class file { open read write getattr execute execute_no_trans map create unlink append };
+    class dir { search read getattr open add_name remove_name write };
+    class tcp_socket { create connect bind listen accept read write getopt setopt };
+    class udp_socket { create connect bind read write getopt setopt };
+    class unix_stream_socket { create connect sendto read write };
+    class sock_file { write create unlink };
+}
+
+# ==============================================================================
+# Type Declarations
+# ==============================================================================
+type mayotix_gaming_t;
+type mayotix_gaming_exec_t;
+type mayotix_gaming_cache_t;
+type mayotix_gaming_data_t;
+
+domain_type(mayotix_gaming_t)
+domain_entry_file(mayotix_gaming_t, mayotix_gaming_exec_t)
+
+files_type(mayotix_gaming_cache_t)
+files_type(mayotix_gaming_data_t)
+
+# ==============================================================================
+# Hardware Acceleration & Multimedia Device Access
+# ==============================================================================
+# GPU Direct Rendering Infrastructure (DRI/DRM) & Vulkan acceleration
+allow mayotix_gaming_t dri_device_t:chr_file { open read write ioctl map getattr };
+
+# Audio subsystem (PipeWire / ALSA / sound devices)
+allow mayotix_gaming_t sound_device_t:chr_file { open read write ioctl getattr };
+
+# Pseudo-terminal access for interactive consoles
+allow mayotix_gaming_t devpts_t:chr_file { open read write ioctl getattr };
+
+# ==============================================================================
+# Dedicated Isolated Storage & Caches
+# ==============================================================================
+# Isolated Mesa/Vulkan shader cache (/var/cache/mayotix/gaming/shaders)
+allow mayotix_gaming_t mayotix_gaming_cache_t:dir { search read getattr open add_name remove_name write };
+allow mayotix_gaming_t mayotix_gaming_cache_t:file { open read write getattr create unlink append map };
+
+# Isolated gaming data & prefixes (/var/lib/mayotix/gaming)
+allow mayotix_gaming_t mayotix_gaming_data_t:dir { search read getattr open add_name remove_name write };
+allow mayotix_gaming_t mayotix_gaming_data_t:file { open read write getattr execute execute_no_trans create unlink append map };
+
+# Temporary memory spaces
+allow mayotix_gaming_t tmp_t:dir { search read getattr open add_name remove_name write };
+allow mayotix_gaming_t tmp_t:file { open read write getattr create unlink map };
+
+# ==============================================================================
+# Multiplayer Network Communication (TCP/UDP)
+# ==============================================================================
+allow mayotix_gaming_t node_t:tcp_socket node_bind;
+allow mayotix_gaming_t netif_t:netif { ingress egress };
+allow mayotix_gaming_t port_t:tcp_socket name_connect;
+allow mayotix_gaming_t self:tcp_socket { create connect bind listen accept read write getopt setopt };
+allow mayotix_gaming_t self:udp_socket { create connect bind read write getopt setopt };
+
+# ==============================================================================
+# Wayland Display Socket Communication
+# ==============================================================================
+allow mayotix_gaming_t self:unix_stream_socket { create connect sendto read write };
+
+# ==============================================================================
+# STRICT AIRGAP: ZERO HOST USER HOME ACCESS
+# ==============================================================================
+# By architectural mandate, no allow rules exist granting mayotix_gaming_t
+# access to user_home_t, ssh_home_t, or gpg_secret_t. Host personal data
+# is completely invisible to proprietary game binaries and anti-cheat hooks.

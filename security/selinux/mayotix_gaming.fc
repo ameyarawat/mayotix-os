@@ -1,0 +1,6 @@
+/usr/local/bin/mayotix-gamemode       -- gen_context(system_u:object_r:mayotix_gaming_exec_t,s0)
+/usr/local/bin/mayotix-proton         -- gen_context(system_u:object_r:mayotix_gaming_exec_t,s0)
+/usr/local/bin/mayotix-steam          -- gen_context(system_u:object_r:mayotix_gaming_exec_t,s0)
+/var/cache/mayotix/gaming(/.*)?          gen_context(system_u:object_r:mayotix_gaming_cache_t,s0)
+/var/lib/mayotix/gaming(/.*)?            gen_context(system_u:object_r:mayotix_gaming_data_t,s0)
+/run/mayotix/gaming(/.*)?                gen_context(system_u:object_r:mayotix_gaming_cache_t,s0)

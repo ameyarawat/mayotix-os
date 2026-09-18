@@ -1,0 +1,10 @@
+[Desktop Entry]
+Name=MAYOTIX Gaming Center
+Comment=Hardened Gaming Optimization & Sandboxed Runtime Studio
+Exec=/usr/bin/python3 /usr/share/mayotix/gaming/mayotix-gaming-gui.py
+Icon=applications-games
+Terminal=false
+Type=Application
+Categories=Game;System;Settings;
+StartupNotify=true
+X-Wayland-Native=true

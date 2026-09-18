@@ -844,6 +844,80 @@ def handle_incident_report(params):
         "reports": reports
     }
 
+def _run_gaming_script(script_name, args, timeout=15):
+    script_path = Path(__file__).resolve().parent.parent / f"desktop/gaming/{script_name}"
+    if not script_path.exists():
+        script_path = Path(f"/usr/local/bin/{script_name}")
+    cmd = [str(script_path)] + args
+    if sys.platform == "win32":
+        for git_bash in [
+            r"C:\Program Files\Git\bin\bash.exe",
+            r"C:\Program Files\Git\usr\bin\bash.exe",
+        ]:
+            if os.path.exists(git_bash):
+                cmd = [git_bash, str(script_path)] + args
+                break
+    elif not os.access(str(script_path), os.X_OK):
+        cmd = ["/bin/bash", str(script_path)] + args
+    res = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
+    try:
+        return json.loads(res.stdout.strip())
+    except Exception:
+        return {"status": "SUCCESS" if res.returncode == 0 else "ERROR", "raw": res.stdout.strip() or res.stderr.strip()}
+
+def handle_game_status(params):
+    dry_run = ["--dry-run"] if params.get("dry_run") else []
+    gm = _run_gaming_script("mayotix-gamemode.sh", ["status", "--json"] + dry_run)
+    gpu = _run_gaming_script("gpu-optimizer.sh", ["status", "--json"] + dry_run)
+    return {
+        "subsystem": "MAYOTIX Gaming & Performance Stack",
+        "gamemode": gm.get("gamemode", {}),
+        "gpu": gpu.get("gpu_probe", {}),
+        "status": "READY"
+    }
+
+def handle_game_gamemode_start(params):
+    args = ["start"]
+    if params.get("pid"):
+        args.append(str(params["pid"]))
+    args.append("--json")
+    if params.get("dry_run"):
+        args.append("--dry-run")
+    return _run_gaming_script("mayotix-gamemode.sh", args)
+
+def handle_game_gamemode_stop(params):
+    args = ["stop", "--json"]
+    if params.get("dry_run"):
+        args.append("--dry-run")
+    return _run_gaming_script("mayotix-gamemode.sh", args)
+
+def handle_game_gpu_status(params):
+    args = ["status", "--json"]
+    if params.get("dry_run"):
+        args.append("--dry-run")
+    return _run_gaming_script("gpu-optimizer.sh", args)
+
+def handle_game_proton_status(params):
+    args = ["status", "--json"]
+    if params.get("dry_run"):
+        args.append("--dry-run")
+    return _run_gaming_script("proton-runner.sh", args)
+
+def handle_game_launch(params):
+    args = ["launch"]
+    if params.get("app"):
+        args.append(str(params["app"]))
+    args.append("--json")
+    if params.get("dry_run"):
+        args.append("--dry-run")
+    return _run_gaming_script("steam-launcher.sh", args)
+
+def handle_game_anticheat_audit(params):
+    args = ["anticheat-check", "--json"]
+    if params.get("dry_run"):
+        args.append("--dry-run")
+    return _run_gaming_script("proton-runner.sh", args)
+
 # ==============================================================================
 # 3. JSON-RPC Protocol Dispatcher
 # ==============================================================================
@@ -887,6 +961,13 @@ RPC_METHODS = {
     "vm.topology_deploy": lambda params: handle_vm_topology_deploy(params),
     "vm.topology_list": lambda params: handle_vm_topology_list(params),
     "vm.topology_teardown": lambda params: handle_vm_topology_teardown(params),
+    "game.status": lambda params: handle_game_status(params),
+    "game.gamemode_start": lambda params: handle_game_gamemode_start(params),
+    "game.gamemode_stop": lambda params: handle_game_gamemode_stop(params),
+    "game.gpu_status": lambda params: handle_game_gpu_status(params),
+    "game.proton_status": lambda params: handle_game_proton_status(params),
+    "game.launch": lambda params: handle_game_launch(params),
+    "game.anticheat_audit": lambda params: handle_game_anticheat_audit(params),
     "incident.triage": lambda params: handle_incident_triage(params),
     "incident.report": lambda params: handle_incident_report(params),
     "ping": lambda params: "pong"
