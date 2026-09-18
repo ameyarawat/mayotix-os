@@ -393,6 +393,91 @@ def cmd_dissect(args):
         sys.stderr.write(res.stderr.strip() + "\n")
     return res.returncode
 
+def cmd_forensic(args):
+    """Executes process memory dump acquisition or dump sanitization."""
+    action = getattr(args, "forensic_action", None) or "dump"
+
+    if action == "dump":
+        dump_script = Path(__file__).resolve().parent.parent / "desktop/defender/forensics/dump-process.sh"
+        if not dump_script.exists():
+            dump_script = Path("/usr/local/sbin/mayotix-dump")
+
+        base_cmd = [str(dump_script)]
+        if sys.platform == "win32":
+            for git_bash in [
+                r"C:\Program Files\Git\bin\bash.exe",
+                r"C:\Program Files\Git\usr\bin\bash.exe",
+            ]:
+                if os.path.exists(git_bash):
+                    base_cmd = [git_bash, str(dump_script)]
+                    break
+        elif not os.access(str(dump_script), os.X_OK):
+            base_cmd = ["/bin/bash", str(dump_script)]
+
+        cmd = list(base_cmd)
+        if getattr(args, "pid", None):
+            cmd.extend(["--pid", str(args.pid)])
+        if getattr(args, "output", None):
+            cmd.extend(["--output", args.output])
+        if getattr(args, "sanitize", False):
+            cmd.append("--sanitize")
+        if getattr(args, "dry_run", False):
+            cmd.append("--dry-run")
+
+        res = subprocess.run(cmd, capture_output=True, text=True)
+        if res.stdout:
+            print(res.stdout.strip())
+        if res.stderr:
+            sys.stderr.write(res.stderr.strip() + "\n")
+        return res.returncode
+
+    elif action == "sanitize":
+        sanitize_script = Path(__file__).resolve().parent.parent / "desktop/defender/forensics/sanitize-dump.py"
+        if not sanitize_script.exists():
+            sanitize_script = Path("/usr/share/mayotix/defender/forensics/sanitize-dump.py")
+
+        cmd = [sys.executable, str(sanitize_script)]
+        if getattr(args, "dump_file", None):
+            cmd.append(args.dump_file)
+        if getattr(args, "output", None):
+            cmd.extend(["--output", args.output])
+        if getattr(args, "json", False):
+            cmd.append("--json")
+        if getattr(args, "dry_run", False):
+            cmd.append("--dry-run")
+
+        res = subprocess.run(cmd, capture_output=True, text=True)
+        if res.stdout:
+            print(res.stdout.strip())
+        if res.stderr:
+            sys.stderr.write(res.stderr.strip() + "\n")
+        return res.returncode
+
+    return 0
+
+def cmd_monitor(args):
+    """Executes live threat behavioral monitoring."""
+    monitor_script = Path(__file__).resolve().parent.parent / "desktop/defender/monitor/threat-monitor.py"
+    if not monitor_script.exists():
+        monitor_script = Path("/usr/share/mayotix/defender/monitor/threat-monitor.py")
+
+    cmd = [sys.executable, str(monitor_script)]
+    if getattr(args, "threats_only", False):
+        cmd.append("--threats-only")
+    if getattr(args, "interval", 0) > 0:
+        cmd.extend(["--interval", str(args.interval)])
+    if getattr(args, "json", False):
+        cmd.append("--json")
+    if getattr(args, "dry_run", False):
+        cmd.append("--dry-run")
+
+    res = subprocess.run(cmd, capture_output=True, text=True)
+    if res.stdout:
+        print(res.stdout.strip())
+    if res.stderr:
+        sys.stderr.write(res.stderr.strip() + "\n")
+    return res.returncode
+
 def cmd_version(args):
     ver = {
         "name": "MAYOTIX OS",
@@ -483,6 +568,32 @@ def main():
     p_dis.add_argument("-c", "--count", type=int, help="Maximum number of packets to dissect")
     p_dis.add_argument("--dry-run", action="store_true", help="Simulate sandboxed dissection")
     p_dis.set_defaults(func=cmd_dissect)
+
+    # mayotix forensic
+    p_forensic = subparsers.add_parser("forensic", parents=[common_parser], help="Volatile process memory extraction and artifact sanitization")
+    forensic_subparsers = p_forensic.add_subparsers(dest="forensic_action", help="Forensic action to perform")
+
+    p_for_dump = forensic_subparsers.add_parser("dump", parents=[common_parser], help="Acquire process memory dump and volatile artifacts")
+    p_for_dump.add_argument("-p", "--pid", type=int, required=True, help="Target process ID to inspect")
+    p_for_dump.add_argument("-o", "--output", help="Destination dump file path")
+    p_for_dump.add_argument("-s", "--sanitize", action="store_true", help="Automatically scrub sensitive secrets")
+    p_for_dump.add_argument("--dry-run", action="store_true", help="Simulate memory dump acquisition")
+    p_for_dump.set_defaults(func=cmd_forensic)
+
+    p_for_san = forensic_subparsers.add_parser("sanitize", parents=[common_parser], help="Scrub credentials and private keys from dump artifact")
+    p_for_san.add_argument("dump_file", nargs="?", default="", help="Path to dump artifact to sanitize")
+    p_for_san.add_argument("-o", "--output", help="Destination sanitized dump file")
+    p_for_san.add_argument("--dry-run", action="store_true", help="Simulate redaction on mock secrets")
+    p_for_san.set_defaults(func=cmd_forensic)
+
+    p_forensic.set_defaults(func=cmd_forensic)
+
+    # mayotix monitor
+    p_mon = subparsers.add_parser("monitor", parents=[common_parser], help="Live runtime threat and process behavioral monitor")
+    p_mon.add_argument("--threats-only", action="store_true", help="Only output alerts when active threats are detected")
+    p_mon.add_argument("--interval", type=int, default=0, help="Continuous polling interval in seconds")
+    p_mon.add_argument("--dry-run", action="store_true", help="Simulate runtime threat monitoring")
+    p_mon.set_defaults(func=cmd_monitor)
 
     # mayotix version
     p_ver = subparsers.add_parser("version", parents=[common_parser], help="Display version and release information")

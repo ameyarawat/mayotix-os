@@ -1,0 +1,68 @@
+module mayotix_forensics 1.0;
+
+require {
+    type unconfined_t;
+    type xdm_t;
+    type bin_t;
+    type lib_t;
+    type etc_t;
+    type var_t;
+    type var_log_t;
+    type tmp_t;
+    type devpts_t;
+    type proc_t;
+    class file { create read write open execute execute_no_trans unlink getattr entrypoint map };
+    class dir { search open read write add_name remove_name getattr rmdir };
+    class process { transition siginh rlimitinh noatsecure signal getsched setsched ptrace getattr };
+    class capability { sys_ptrace dac_read_search sys_resource };
+    class chr_file { read write open getattr ioctl };
+    class fifo_file { read write getattr };
+}
+
+# Define forensics domain and execution types
+type mayotix_forensics_t;
+type mayotix_forensics_exec_t;
+type mayotix_forensics_log_t;
+
+# Process entrypoint
+allow mayotix_forensics_t self:process { signal getsched setsched };
+allow mayotix_forensics_t mayotix_forensics_exec_t:file { entrypoint read open execute getattr map };
+
+# Allow domain transition from unconfined user and desktop session
+type_transition unconfined_t mayotix_forensics_exec_t:process mayotix_forensics_t;
+allow unconfined_t mayotix_forensics_t:process { transition siginh rlimitinh noatsecure };
+allow unconfined_t mayotix_forensics_exec_t:file { read open execute getattr };
+
+type_transition xdm_t mayotix_forensics_exec_t:process mayotix_forensics_t;
+allow xdm_t mayotix_forensics_t:process { transition siginh rlimitinh noatsecure };
+allow xdm_t mayotix_forensics_exec_t:file { read open execute getattr };
+
+# Bounded capabilities for memory extraction and proc reading
+allow mayotix_forensics_t self:capability { sys_ptrace dac_read_search sys_resource };
+
+# Process inspection rights
+allow mayotix_forensics_t self:process { ptrace getattr };
+allow mayotix_forensics_t proc_t:dir { search open read getattr };
+allow mayotix_forensics_t proc_t:file { read open getattr map };
+
+# System library & interpreter execution
+allow mayotix_forensics_t bin_t:file { read open execute execute_no_trans getattr map };
+allow mayotix_forensics_t lib_t:file { read open execute getattr map };
+
+# System configuration reading
+allow mayotix_forensics_t etc_t:file { read open getattr };
+allow mayotix_forensics_t etc_t:dir { search open getattr };
+
+# Confined logging: Dedicated forensic storage under /var/log/mayotix/forensics
+allow mayotix_forensics_t var_t:dir { search open getattr };
+allow mayotix_forensics_t var_log_t:dir { search open getattr };
+allow mayotix_forensics_t mayotix_forensics_log_t:dir { search open read write add_name remove_name getattr rmdir };
+allow mayotix_forensics_t mayotix_forensics_log_t:file { create read write open unlink getattr rename map };
+
+# Temporary file creation
+allow mayotix_forensics_t tmp_t:dir { search open read write add_name remove_name getattr rmdir };
+allow mayotix_forensics_t tmp_t:file { create read write open unlink getattr map };
+
+# Terminal and standard I/O redirection
+allow mayotix_forensics_t devpts_t:chr_file { read write open getattr ioctl };
+allow mayotix_forensics_t self:fifo_file { read write getattr };
