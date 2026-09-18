@@ -272,7 +272,7 @@ fi
 echo -e "${BLUE}[INFO]${NC} Building MAYOTIX OS Live ISO..."
 echo -e "${YELLOW}[WARN]${NC} This process takes 15-30 minutes and requires ~10GB free disk space."
 
-mkdir -p "$ISO_OUTPUT_DIR"
+rm -rf "$ISO_OUTPUT_DIR"
 mkdir -p "$LORAX_TMPDIR"
 
 livemedia-creator \
