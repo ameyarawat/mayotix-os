@@ -1,0 +1,59 @@
+module mayotix_dissector 1.0;
+
+require {
+    type unconfined_t;
+    type xdm_t;
+    type bin_t;
+    type lib_t;
+    type etc_t;
+    type var_t;
+    type var_log_t;
+    type tmp_t;
+    type devpts_t;
+    type mayotix_defender_log_t;
+    class unix_stream_socket { connectto create bind listen accept getattr };
+    class file { read open execute execute_no_trans unlink getattr entrypoint map };
+    class dir { search open read getattr };
+    class process { transition siginh rlimitinh noatsecure signal getsched setsched };
+    class chr_file { read write open getattr ioctl };
+    class fifo_file { read write getattr };
+}
+
+# Define dissector domain and execution types
+type mayotix_dissector_t;
+type mayotix_dissector_exec_t;
+
+# Process entrypoint
+allow mayotix_dissector_t self:process { signal getsched setsched };
+allow mayotix_dissector_t mayotix_dissector_exec_t:file { entrypoint read open execute getattr map };
+
+# Allow domain transition from unconfined user and desktop session
+type_transition unconfined_t mayotix_dissector_exec_t:process mayotix_dissector_t;
+allow unconfined_t mayotix_dissector_t:process { transition siginh rlimitinh noatsecure };
+allow unconfined_t mayotix_dissector_exec_t:file { read open execute getattr };
+
+type_transition xdm_t mayotix_dissector_exec_t:process mayotix_dissector_t;
+allow xdm_t mayotix_dissector_t:process { transition siginh rlimitinh noatsecure };
+allow xdm_t mayotix_dissector_exec_t:file { read open execute getattr };
+
+# System library and capture binary execution
+allow mayotix_dissector_t bin_t:file { read open execute execute_no_trans getattr map };
+allow mayotix_dissector_t lib_t:file { read open execute getattr map };
+
+# System configuration reading (protocols, services)
+allow mayotix_dissector_t etc_t:file { read open getattr };
+allow mayotix_dissector_t etc_t:dir { search open getattr };
+
+# Read-only access to captured PCAP logs
+allow mayotix_dissector_t var_t:dir { search open getattr };
+allow mayotix_dissector_t var_log_t:dir { search open getattr };
+allow mayotix_dissector_t mayotix_defender_log_t:dir { search open read getattr };
+allow mayotix_dissector_t mayotix_defender_log_t:file { read open getattr map };
+
+# Temporary files (read-only or pipes)
+allow mayotix_dissector_t tmp_t:dir { search open read getattr };
+allow mayotix_dissector_t tmp_t:file { read open getattr map };
+
+# Terminal and standard I/O redirection
+allow mayotix_dissector_t devpts_t:chr_file { read write open getattr ioctl };
+allow mayotix_dissector_t self:fifo_file { read write getattr };

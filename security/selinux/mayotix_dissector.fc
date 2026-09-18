@@ -1,0 +1,4 @@
+# MAYOTIX OS Phase 7: Dissector Sandbox SELinux File Contexts
+
+/usr/local/sbin/mayotix-dissect        -- gen_context(system_u:object_r:mayotix_dissector_exec_t,s0)
+/usr/share/mayotix/defender/dissect-pcap\.sh -- gen_context(system_u:object_r:mayotix_dissector_exec_t,s0)

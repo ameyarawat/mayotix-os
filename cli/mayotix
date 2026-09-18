@@ -333,6 +333,66 @@ def cmd_capture(args):
         print(res.stdout.strip() or res.stderr.strip())
         return res.returncode
 
+def cmd_analyze(args):
+    """Executes automated threat & security heuristics scanning on PCAP."""
+    scan_script = Path(__file__).resolve().parent.parent / "desktop/defender/scan-pcap.py"
+    if not scan_script.exists():
+        scan_script = Path("/usr/share/mayotix/defender/scan-pcap.py")
+
+    cmd = [sys.executable, str(scan_script)]
+    if getattr(args, "pcap_file", None):
+        cmd.append(args.pcap_file)
+    if getattr(args, "json", False):
+        cmd.append("--json")
+    if getattr(args, "dry_run", False):
+        cmd.append("--dry-run")
+
+    res = subprocess.run(cmd, capture_output=True, text=True)
+    if res.stdout:
+        print(res.stdout.strip())
+    if res.stderr:
+        sys.stderr.write(res.stderr.strip() + "\n")
+    return res.returncode
+
+def cmd_dissect(args):
+    """Executes sandboxed PCAP dissector inside isolated Bubblewrap container."""
+    dissect_script = Path(__file__).resolve().parent.parent / "desktop/defender/dissect-pcap.sh"
+    if not dissect_script.exists():
+        dissect_script = Path("/usr/local/sbin/mayotix-dissect")
+
+    base_cmd = [str(dissect_script)]
+    if sys.platform == "win32":
+        for git_bash in [
+            r"C:\Program Files\Git\bin\bash.exe",
+            r"C:\Program Files\Git\usr\bin\bash.exe",
+        ]:
+            if os.path.exists(git_bash):
+                base_cmd = [git_bash, str(dissect_script)]
+                break
+    elif not os.access(str(dissect_script), os.X_OK):
+        base_cmd = ["/bin/bash", str(dissect_script)]
+
+    cmd = list(base_cmd)
+    if getattr(args, "pcap_file", None):
+        cmd.append(args.pcap_file)
+    if getattr(args, "summary", False):
+        cmd.append("--summary")
+    if getattr(args, "filter", None):
+        cmd.extend(["--filter", args.filter])
+    if getattr(args, "tool", None):
+        cmd.extend(["--tool", args.tool])
+    if getattr(args, "count", None):
+        cmd.extend(["--count", str(args.count)])
+    if getattr(args, "dry_run", False):
+        cmd.append("--dry-run")
+
+    res = subprocess.run(cmd, capture_output=True, text=True)
+    if res.stdout:
+        print(res.stdout.strip())
+    if res.stderr:
+        sys.stderr.write(res.stderr.strip() + "\n")
+    return res.returncode
+
 def cmd_version(args):
     ver = {
         "name": "MAYOTIX OS",
@@ -407,6 +467,22 @@ def main():
     p_cap_profiles.set_defaults(func=cmd_capture)
 
     p_cap.set_defaults(func=cmd_capture)
+
+    # mayotix analyze
+    p_ana = subparsers.add_parser("analyze", parents=[common_parser], help="Automated threat & security heuristic analysis of PCAP capture")
+    p_ana.add_argument("pcap_file", nargs="?", default="", help="Path to PCAP file to analyze")
+    p_ana.add_argument("--dry-run", action="store_true", help="Simulate threat analysis on mock capture")
+    p_ana.set_defaults(func=cmd_analyze)
+
+    # mayotix dissect
+    p_dis = subparsers.add_parser("dissect", parents=[common_parser], help="Execute sandboxed PCAP dissector inside Bubblewrap container")
+    p_dis.add_argument("pcap_file", nargs="?", default="", help="Path to PCAP file to dissect")
+    p_dis.add_argument("-s", "--summary", action="store_true", help="Display packet summary and protocol breakdown")
+    p_dis.add_argument("-f", "--filter", help="Filter expression (display filter or BPF)")
+    p_dis.add_argument("-t", "--tool", default="tshark", help="Dissector tool ('tshark' or 'tcpdump')")
+    p_dis.add_argument("-c", "--count", type=int, help="Maximum number of packets to dissect")
+    p_dis.add_argument("--dry-run", action="store_true", help="Simulate sandboxed dissection")
+    p_dis.set_defaults(func=cmd_dissect)
 
     # mayotix version
     p_ver = subparsers.add_parser("version", parents=[common_parser], help="Display version and release information")

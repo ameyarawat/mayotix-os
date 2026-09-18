@@ -1,0 +1,9 @@
+# MAYOTIX OS Phase 7 Week 2: Bubblewrap Profile for Offline PCAP Dissector Sandbox
+# Completely isolated offline environment for analyzing untrusted packet capture files.
+# Drops all network access, all capabilities, and enforces minimal read-only mounts.
+
+NETWORK="none"
+CAPABILITIES=""
+SECCOMP="strict"
+TMP_SIZE="64M"
+HOME_SIZE="64M"
