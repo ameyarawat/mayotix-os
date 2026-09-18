@@ -1,0 +1,41 @@
+# ==============================================================================
+# MAYOTIX OS - Hardened Kernel WireGuard Client Configuration Template
+# Profile: Pre-Shared Key (PSK) Enhanced Security (wg0-psk)
+# ==============================================================================
+# Security Standard: Noise_IKpsk2 protocol (Symmetric Pre-shared Key Layer)
+# Added Defense: Mixes 256-bit symmetric key into ECDH handshake, providing
+# post-quantum resistance against future quantum computer key compromise.
+# Permissions: Must be chmod 0600 and owned by root:root
+# ==============================================================================
+
+[Interface]
+# Client private key (Curve25519)
+PrivateKey = {{CLIENT_PRIVATE_KEY}}
+
+# Client tunnel IPv4 and IPv6 addresses
+Address = {{CLIENT_IPV4_ADDRESS}}/32, {{CLIENT_IPV6_ADDRESS}}/128
+
+# Enforce system-wide Encrypted DNS (DNS-over-TLS via systemd-resolved stub)
+DNS = 127.0.0.53
+
+# Tunnel MTU optimization
+MTU = 1420
+
+# Strict interface table routing
+Table = auto
+
+[Peer]
+# Server public key (Curve25519)
+PublicKey = {{SERVER_PUBLIC_KEY}}
+
+# 256-bit Pre-shared Key (Generated with 'wg genpsk', secret symmetric overlay)
+PresharedKey = {{PRESHARED_KEY}}
+
+# Server VPN gateway endpoint
+Endpoint = {{SERVER_ENDPOINT_IP}}:{{SERVER_ENDPOINT_PORT}}
+
+# Full tunnel encapsulation with DNS leak prevention
+AllowedIPs = 0.0.0.0/0, ::/0
+
+# Persistent Keepalive to prevent stateful NAT session expiration (25s)
+PersistentKeepalive = 25

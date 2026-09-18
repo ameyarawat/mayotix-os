@@ -1,0 +1,37 @@
+# ==============================================================================
+# MAYOTIX OS - Hardened Kernel WireGuard Client Configuration Template
+# Profile: Standard Client (wg0)
+# ==============================================================================
+# Security Standard: Noise_IKpsk2 / Noise_IK protocol, Curve25519, ChaCha20-Poly1305
+# Permissions: Must be chmod 0600 and owned by root:root
+# ==============================================================================
+
+[Interface]
+# Client private key (Generated with 'wg genkey', chmod 0600)
+PrivateKey = {{CLIENT_PRIVATE_KEY}}
+
+# Client tunnel IPv4 and IPv6 addresses
+Address = {{CLIENT_IPV4_ADDRESS}}/32, {{CLIENT_IPV6_ADDRESS}}/128
+
+# Enforce DNS routing through systemd-resolved Encrypted DNS stub (DNS-over-TLS)
+DNS = 127.0.0.53
+
+# Tunnel MTU (1420 recommended for IPv4/IPv6 encapsulation over Ethernet)
+MTU = 1420
+
+# Optional: Firewall and routing rules for leak prevention
+# PostUp = iptables -A OUTPUT -o %i -m comment --comment "mayotix-wg-out" -j ACCEPT
+# PostDown = iptables -D OUTPUT -o %i -m comment --comment "mayotix-wg-out" -j ACCEPT
+
+[Peer]
+# Server public key
+PublicKey = {{SERVER_PUBLIC_KEY}}
+
+# Server VPN gateway endpoint (FQDN or IP and port)
+Endpoint = {{SERVER_ENDPOINT_IP}}:{{SERVER_ENDPOINT_PORT}}
+
+# Tunnel routing: 0.0.0.0/0, ::/0 for full tunnel, or specific subnets for split tunnel
+AllowedIPs = 0.0.0.0/0, ::/0
+
+# Persistent Keepalive to maintain stateful NAT traversal and firewall sessions (in seconds)
+PersistentKeepalive = 25

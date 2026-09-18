@@ -1,0 +1,49 @@
+[Unit]
+Description=MAYOTIX WireGuard Tunnel Health Watchdog
+Documentation=man:wg(8) https://mayotix.os/docs/phase5
+After=network-online.target systemd-resolved.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/manage-wireguard.sh watchdog --interface wg0 --threshold 180
+
+### Security Hardening - Filesystem & Process Isolation
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectSystem=strict
+ProtectHome=yes
+ProtectKernelTunables=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+LockPersonality=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+RemoveIPC=yes
+
+### Network & Capabilities Configuration
+NoNewPrivileges=yes
+CapabilityBoundingSet=CAP_NET_ADMIN CAP_NET_RAW
+AmbientCapabilities=
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6 AF_NETLINK
+
+### Paths & Permissions
+ReadWritePaths=/etc/wireguard /run /var/run
+ReadOnlyPaths=/usr /bin /sbin /lib /lib64 /etc
+
+### System Call Filtering
+SystemCallErrorNumber=EPERM
+SystemCallFilter=~@clock @debug @module @mount @obsolete @raw-io @reboot @swap
+
+### Resource Limits
+LimitNOFILE=4096
+LimitNPROC=128
+
+### Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=mayotix-wg-watchdog
+
+[Install]
+WantedBy=multi-user.target

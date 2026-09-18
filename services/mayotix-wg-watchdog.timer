@@ -1,0 +1,14 @@
+[Unit]
+Description=MAYOTIX WireGuard Tunnel Health Watchdog Periodic Timer
+Documentation=man:wg(8) https://mayotix.os/docs/phase5
+After=network-online.target
+
+[Timer]
+OnBootSec=1min
+OnUnitActiveSec=60s
+AccuracySec=5s
+Persistent=true
+Unit=mayotix-wg-watchdog.service
+
+[Install]
+WantedBy=timers.target
