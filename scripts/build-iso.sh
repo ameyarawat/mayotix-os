@@ -71,7 +71,6 @@ cat > "$KS_FILE" << 'KICKSTART_EOF'
 # ==============================================================================
 
 # Installation Mode
-version=F40
 text
 reboot
 
@@ -277,6 +276,7 @@ mkdir -p "$ISO_OUTPUT_DIR"
 mkdir -p "$LORAX_TMPDIR"
 
 livemedia-creator \
+    --make-iso \
     --ks="$KS_FILE" \
     --no-virt \
     --resultdir="$ISO_OUTPUT_DIR" \
