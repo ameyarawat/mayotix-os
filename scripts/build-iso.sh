@@ -116,6 +116,8 @@ btrfs-progs
 cryptsetup
 clevis
 clevis-luks
+dracut-live
+dracut-squash
 
 # Security & Hardening
 selinux-policy-targeted
