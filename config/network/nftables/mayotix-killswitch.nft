@@ -1,0 +1,107 @@
+#!/usr/sbin/nft -f
+# MAYOTIX OS Phase 5 Week 3: Fail-Closed nftables Network Kill-Switch Ruleset
+#
+# Enforces strict drop-by-default traffic filtering on physical network interfaces.
+# All unencapsulated outbound application traffic is dropped unless transmitted
+# through active WireGuard interfaces (wg*), encrypted DNS (DoT port 853),
+# WireGuard UDP encapsulation (port 51820), loopback, or essential DHCP/ICMP.
+
+flush table inet mayotix_killswitch
+table inet mayotix_killswitch {
+    # Counter definitions for auditing dropped cleartext packets
+    counter dropped_input_cleartext { }
+    counter dropped_output_cleartext { }
+
+    chain input {
+        type filter hook input priority filter; policy drop;
+
+        # 1. Unrestricted Loopback Traffic
+        iifname "lo" accept
+
+        # 2. Connection Tracking - Established & Related Sessions
+        ct state established,related accept
+
+        # 3. Invalid Packet Drop
+        ct state invalid drop
+
+        # 4. Essential Control Protocols (ICMP / ICMPv6)
+        ip protocol icmp accept
+        icmpv6 type {
+            destination-unreachable,
+            packet-too-big,
+            time-exceeded,
+            parameter-problem,
+            echo-request,
+            echo-reply,
+            nd-router-solicit,
+            nd-router-advert,
+            nd-neighbor-solicit,
+            nd-neighbor-advert
+        } accept
+
+        # 5. Link-Local DHCP Client Response (IPv4 UDP 67/68, IPv6 UDP 547/546)
+        udp sport 67 udp dport 68 accept
+        udp sport 547 udp dport 546 accept
+
+        # 6. Encapsulated WireGuard Inbound Traffic
+        iifname "wg*" accept
+
+        # Audit Counter & Default Rejection
+        counter name dropped_input_cleartext drop
+    }
+
+    chain forward {
+        type filter hook forward priority filter; policy drop;
+        # Transit / Forwarding traffic disabled strictly for workstation security
+        drop
+    }
+
+    chain output {
+        type filter hook output priority filter; policy drop;
+
+        # 1. Unrestricted Loopback Traffic
+        oifname "lo" accept
+
+        # 2. Connection Tracking - Established & Related Sessions
+        ct state established,related accept
+
+        # 3. Invalid Packet Drop
+        ct state invalid drop
+
+        # 4. Essential Control Protocols (ICMP / ICMPv6)
+        ip protocol icmp accept
+        icmpv6 type {
+            destination-unreachable,
+            packet-too-big,
+            time-exceeded,
+            parameter-problem,
+            echo-request,
+            echo-reply,
+            nd-router-solicit,
+            nd-router-advert,
+            nd-neighbor-solicit,
+            nd-neighbor-advert
+        } accept
+
+        # 5. Link-Local DHCP Client Requests (IPv4 UDP 68->67, IPv6 UDP 546->547)
+        udp sport 68 udp dport 67 accept
+        udp sport 546 udp dport 547 accept
+
+        # 6. WireGuard Tunnel Encapsulation (UDP Port 51820)
+        udp dport 51820 accept
+
+        # 7. System-Wide Encrypted DNS-over-TLS (TCP/UDP Port 853)
+        tcp dport 853 accept
+        udp dport 853 accept
+
+        # 8. Local systemd-resolved DNS Stub Pointer (127.0.0.53 / 53)
+        ip daddr 127.0.0.53 udp dport 53 accept
+        ip daddr 127.0.0.53 tcp dport 53 accept
+
+        # 9. Allowed WireGuard Tunnel Interface Egress Traffic
+        oifname "wg*" accept
+
+        # Audit Counter & Default Rejection for Unencrypted Outbound Egress
+        counter name dropped_output_cleartext drop
+    }
+}

@@ -1,0 +1,55 @@
+[Unit]
+Description=MAYOTIX OS Fail-Closed nftables Network Kill-Switch
+Documentation=man:nft(8) https://mayotix.os/docs/phase5
+DefaultDependencies=no
+Before=network-pre.target shutdown.target
+Wants=network-pre.target
+Conflicts=shutdown.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+
+### Execution Commands
+ExecStart=/usr/local/bin/manage-killswitch.sh enable --ruleset /etc/nftables/mayotix-killswitch.nft
+ExecStop=/usr/local/bin/manage-killswitch.sh disable
+
+### Security Hardening - Filesystem & Process Isolation
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectSystem=strict
+ProtectHome=yes
+ProtectKernelTunables=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+LockPersonality=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+RemoveIPC=yes
+
+### Network & Capabilities Configuration
+NoNewPrivileges=yes
+CapabilityBoundingSet=CAP_NET_ADMIN CAP_NET_RAW
+AmbientCapabilities=
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6 AF_NETLINK
+
+### Paths & Permissions
+ReadWritePaths=/run /var/run
+ReadOnlyPaths=/usr /bin /sbin /lib /lib64 /etc /etc/nftables
+
+### System Call Filtering
+SystemCallErrorNumber=EPERM
+SystemCallFilter=~@clock @debug @module @mount @obsolete @raw-io @reboot @swap
+
+### Resource Limits
+LimitNOFILE=4096
+LimitNPROC=128
+
+### Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=mayotix-killswitch
+
+[Install]
+WantedBy=network-pre.target
