@@ -1,0 +1,30 @@
+# MAYOTIX OS Phase 5 Week 4: Hardened Tor Daemon Configuration
+#
+# Provides isolated SOCKS5 proxy, transparent routing (TransPort),
+# anonymized DNS resolution (DNSPort), and authenticated control access.
+
+# Network Service Binding & Isolation
+SocksPort 127.0.0.1:9050 IsolateDestAddr IsolateDestPort
+TransPort 127.0.0.1:9040
+DNSPort 127.0.0.1:9053
+ControlPort 127.0.0.1:9051
+
+# Control Interface Security
+CookieAuthentication 1
+CookieAuthFile /run/tor/control.authcookie
+
+# Cryptographic & Hardening Directives
+SafeLogging 1
+AvoidDiskWrites 1
+DisableDebuggerAttachment 1
+ClientOnly 1
+HardwareAccel 1
+
+# Onion Domain Resolution & Virtual Network Mapping
+AutomapHostsOnResolve 1
+AutomapHostsSuffixes .onion
+VirtualAddrNetworkIPv4 10.192.0.0/10
+
+# Daemon Logging & Data Directory
+Log notice stderr
+DataDirectory /var/lib/tor-mayotix

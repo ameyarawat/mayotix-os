@@ -1,0 +1,61 @@
+#!/usr/sbin/nft -f
+# MAYOTIX OS Phase 5 Week 4: Transparent Tor Router & Leak Prevention Ruleset
+#
+# Table: inet mayotix_tor
+# Enforces transparent proxying of TCP traffic to Tor TransPort (127.0.0.1:9040),
+# DNS queries to Tor DNSPort (127.0.0.1:9053), and blocks all non-TCP/UDP cleartext leaks.
+
+flush table inet mayotix_tor
+table inet mayotix_tor {
+    # Packet & Egress Statistics Counters
+    counter routed_tor_tcp_packets { }
+    counter routed_tor_dns_queries { }
+    counter blocked_tor_leak_packets { }
+
+    chain prerouting {
+        type nat hook prerouting priority dstnat; policy accept;
+
+        # Redirect Tor-marked DNS queries to local Tor DNSPort (9053)
+        meta mark 0x200 udp dport 53 counter name routed_tor_dns_queries redirect to :9053
+        meta mark 0x200 tcp dport 53 counter name routed_tor_dns_queries redirect to :9053
+
+        # Redirect all other Tor-marked TCP traffic to local Tor TransPort (9040)
+        meta mark 0x200 tcp dport != 53 counter name routed_tor_tcp_packets redirect to :9040
+    }
+
+    chain output {
+        type route hook output priority mangle; policy accept;
+
+        # Mark outbound packets from Tor-isolated GID (group 9050 / mayotix-tor-user)
+        meta gid 9050 meta mark set 0x200
+    }
+
+    chain input {
+        type filter hook input priority filter; policy accept;
+
+        # Accept loopback traffic for Tor listeners
+        iifname "lo" tcp dport { 9050, 9040, 9051 } accept
+        iifname "lo" udp dport 9053 accept
+    }
+
+    chain forward {
+        type filter hook forward priority filter; policy drop;
+
+        # Prevent forwarding for Tor-isolated sessions
+        meta mark 0x200 drop
+    }
+
+    chain leak_prevention {
+        type filter hook output priority filter; policy accept;
+
+        # Allow established state for Tor control and streams
+        meta mark 0x200 ct state established,related accept
+
+        # Allow local loops to Tor ports
+        meta mark 0x200 ip daddr 127.0.0.1 tcp dport { 9040, 9050, 9051 } accept
+        meta mark 0x200 ip daddr 127.0.0.1 udp dport 9053 accept
+
+        # DROP and COUNT any non-TCP traffic (UDP/ICMP leak prevention) for Tor sessions
+        meta mark 0x200 ip protocol != tcp counter name blocked_tor_leak_packets drop
+    }
+}
