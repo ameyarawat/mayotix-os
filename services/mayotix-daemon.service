@@ -34,6 +34,7 @@ LockPersonality=yes
 # Network & Admin Capabilities for Subsystem Inspection & Killswitch Toggle
 CapabilityBoundingSet=CAP_NET_ADMIN CAP_NET_RAW CAP_DAC_OVERRIDE
 AmbientCapabilities=CAP_NET_ADMIN CAP_NET_RAW
+NoNewPrivileges=yes
 
 [Install]
 WantedBy=multi-user.target
