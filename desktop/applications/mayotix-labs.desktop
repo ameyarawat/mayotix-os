@@ -1,0 +1,10 @@
+[Desktop Entry]
+Name=MAYOTIX Labs
+Comment=Isolated Disposable Sandboxes, Dynamic Traffic Sinkhole & Malware Detonation Studio
+Exec=python3 /usr/share/mayotix/labs/mayotix-labs-gui.py
+Icon=utilities-terminal
+Terminal=false
+Type=Application
+Categories=System;Security;Development;
+StartupNotify=true
+Keywords=security;sandbox;malware;detonation;sinkhole;labs;triage;incident;forensics;
