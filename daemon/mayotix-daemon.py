@@ -561,7 +561,69 @@ def handle_lab_sinkhole_logs(params):
                 lines = [json.loads(line) for line in f.readlines()[-50:] if line.strip()]
         except Exception:
             pass
-    return {"log_count": len(lines), "events": lines}
+def handle_lab_detonate(params):
+    detonate_script = Path(__file__).resolve().parent.parent / "desktop/labs/detonation-pipeline.sh"
+    if not detonate_script.exists():
+        detonate_script = Path("/usr/local/sbin/mayotix-lab-detonate")
+
+    cmd = [str(detonate_script), "run", "--json"]
+    if params.get("sample"):
+        cmd.append(str(params["sample"]))
+    if params.get("timeout"):
+        cmd.extend(["--timeout", str(params["timeout"])])
+    if params.get("network"):
+        cmd.extend(["--network", str(params["network"])])
+    if params.get("dry_run"):
+        cmd.append("--dry-run")
+
+    if sys.platform == "win32":
+        for git_bash in [
+            r"C:\Program Files\Git\bin\bash.exe",
+            r"C:\Program Files\Git\usr\bin\bash.exe",
+        ]:
+            if os.path.exists(git_bash):
+                cmd = [git_bash] + cmd
+                break
+    elif not os.access(str(detonate_script), os.X_OK):
+        cmd = ["/bin/bash"] + cmd
+
+    res = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
+    try:
+        return json.loads(res.stdout.strip())
+    except Exception:
+        return {"status": "UNKNOWN", "raw": res.stdout.strip() or res.stderr.strip()}
+
+def handle_lab_detonation_list(params):
+    analyzer_script = Path(__file__).resolve().parent.parent / "desktop/labs/behavior-analyzer.py"
+    if not analyzer_script.exists():
+        analyzer_script = Path("/usr/share/mayotix/labs/behavior-analyzer.py")
+
+    cmd = [sys.executable, str(analyzer_script), "list", "--json"]
+    if params.get("dry_run"):
+        cmd.append("--dry-run")
+    res = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
+    try:
+        return json.loads(res.stdout.strip())
+    except Exception:
+        return {"total_reports": 0, "reports": []}
+
+def handle_lab_detonation_report(params):
+    report_id = params.get("report_id", "")
+    rep_dir = Path("/var/log/mayotix/labs/reports")
+    target = rep_dir / f"detonation_{report_id}.json"
+    if target.exists():
+        try:
+            return json.loads(target.read_text(encoding="utf-8"))
+        except Exception as e:
+            return {"error": f"Failed to read report: {str(e)}"}
+    elif params.get("dry_run"):
+        return {
+            "session_id": report_id or "detonate-1789726800-9001",
+            "status": "COMPLETED",
+            "dry_run": True,
+            "threat_evaluation": {"risk_score": 85, "severity": "HIGH"}
+        }
+    return {"error": f"Report '{report_id}' not found"}
 
 def handle_incident_triage(params):
     triage_script = Path(__file__).resolve().parent.parent / "desktop/defender/incident/triage-snapshot.sh"
@@ -627,6 +689,9 @@ RPC_METHODS = {
     "lab.sinkhole_stop": lambda params: handle_lab_sinkhole_stop(params),
     "lab.sinkhole_status": lambda params: handle_lab_sinkhole_status(params),
     "lab.sinkhole_logs": lambda params: handle_lab_sinkhole_logs(params),
+    "lab.detonate": lambda params: handle_lab_detonate(params),
+    "lab.detonation_list": lambda params: handle_lab_detonation_list(params),
+    "lab.detonation_report": lambda params: handle_lab_detonation_report(params),
     "incident.triage": lambda params: handle_incident_triage(params),
     "incident.report": lambda params: handle_incident_report(params),
     "ping": lambda params: "pong"

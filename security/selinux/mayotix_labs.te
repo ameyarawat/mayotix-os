@@ -17,8 +17,8 @@ require {
     type http_port_t;
     class file { create read write open execute execute_no_trans unlink getattr entrypoint map };
     class dir { search open read write add_name remove_name getattr rmdir };
-    class process { transition siginh rlimitinh noatsecure signal getsched setsched setpgid fork getattr };
-    class capability { setuid setgid sys_admin sys_chroot net_admin dac_override };
+    class process { transition siginh rlimitinh noatsecure signal getsched setsched setpgid fork getattr ptrace };
+    class capability { setuid setgid sys_admin sys_chroot net_admin dac_override sys_ptrace };
     class chr_file { read write open getattr ioctl };
     class fifo_file { read write getattr };
     class udp_socket { create bind setopt getattr read write name_bind };
@@ -32,7 +32,7 @@ type mayotix_labs_exec_t;
 type mayotix_labs_log_t;
 
 # Process entrypoint
-allow mayotix_labs_t self:process { signal getsched setsched setpgid fork getattr };
+allow mayotix_labs_t self:process { signal getsched setsched setpgid fork getattr ptrace };
 allow mayotix_labs_t mayotix_labs_exec_t:file { entrypoint read open execute getattr map };
 
 # Allow domain transition from unconfined user and desktop session
@@ -45,7 +45,7 @@ allow xdm_t mayotix_labs_t:process { transition siginh rlimitinh noatsecure };
 allow xdm_t mayotix_labs_exec_t:file { read open execute getattr };
 
 # Bounded capabilities for container/sandbox namespaces and bridge routing
-allow mayotix_labs_t self:capability { setuid setgid sys_admin sys_chroot net_admin dac_override };
+allow mayotix_labs_t self:capability { setuid setgid sys_admin sys_chroot net_admin dac_override sys_ptrace };
 
 # Internal bridge and loopback socket networking
 allow mayotix_labs_t self:udp_socket { create bind setopt getattr read write name_bind };

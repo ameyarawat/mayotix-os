@@ -566,6 +566,8 @@ def cmd_lab(args):
 
         if sub_action == "logs":
             res = query_subsystem("lab.sinkhole_logs", sock_path=args.socket)
+            if res is None:
+                res = local_fallback("lab.sinkhole_logs") or {"log_count": 0, "events": []}
             if getattr(args, "json", False):
                 print(json.dumps(res, indent=2))
             else:
@@ -601,6 +603,50 @@ def cmd_lab(args):
             res = subprocess.run(cmd, capture_output=True, text=True)
             print(res.stdout.strip() or res.stderr.strip())
             return res.returncode
+
+    elif action == "detonate":
+        det_script = Path(__file__).resolve().parent.parent / "desktop/labs/detonation-pipeline.sh"
+        if not det_script.exists():
+            det_script = Path("/usr/local/sbin/mayotix-lab-detonate")
+        det_cmd = [str(det_script)]
+        if sys.platform == "win32":
+            for git_bash in [
+                r"C:\Program Files\Git\bin\bash.exe",
+                r"C:\Program Files\Git\usr\bin\bash.exe",
+            ]:
+                if os.path.exists(git_bash):
+                    det_cmd = [git_bash, str(det_script)]
+                    break
+        elif not os.access(str(det_script), os.X_OK):
+            det_cmd = ["/bin/bash", str(det_script)]
+
+        cmd = list(det_cmd) + ["run"]
+        sample = getattr(args, "sample", None) or "/tmp/mock-sample.bin"
+        cmd.append(sample)
+        if getattr(args, "timeout", None):
+            cmd.extend(["--timeout", str(args.timeout)])
+        if getattr(args, "network", None):
+            cmd.extend(["--network", str(args.network)])
+        if getattr(args, "json", False):
+            cmd.append("--json")
+        if getattr(args, "dry_run", False):
+            cmd.append("--dry-run")
+        res = subprocess.run(cmd, capture_output=True, text=True)
+        print(res.stdout.strip() or res.stderr.strip())
+        return res.returncode
+
+    elif action == "reports":
+        analyzer_script = Path(__file__).resolve().parent.parent / "desktop/labs/behavior-analyzer.py"
+        if not analyzer_script.exists():
+            analyzer_script = Path("/usr/share/mayotix/labs/behavior-analyzer.py")
+        cmd = [sys.executable, str(analyzer_script), "list"]
+        if getattr(args, "json", False):
+            cmd.append("--json")
+        if getattr(args, "dry_run", False):
+            cmd.append("--dry-run")
+        res = subprocess.run(cmd, capture_output=True, text=True)
+        print(res.stdout.strip() or res.stderr.strip())
+        return res.returncode
 
     else:
         # status
@@ -873,6 +919,19 @@ def main():
     p_sink_status.set_defaults(func=cmd_lab)
 
     p_lab_sink.set_defaults(func=cmd_lab)
+
+    # mayotix lab detonate
+    p_lab_detonate = lab_subparsers.add_parser("detonate", parents=[common_parser], help="Detonate sample in isolated ephemeral sandbox under syscall tracing")
+    p_lab_detonate.add_argument("sample", nargs="?", default="/tmp/mock-sample.bin", help="Path to sample file")
+    p_lab_detonate.add_argument("-t", "--timeout", type=int, default=10, help="Execution timeout in seconds")
+    p_lab_detonate.add_argument("-n", "--network", default="bridge", help="Network mode (none, bridge)")
+    p_lab_detonate.add_argument("--dry-run", action="store_true", help="Simulate detonation")
+    p_lab_detonate.set_defaults(func=cmd_lab)
+
+    # mayotix lab reports
+    p_lab_reports = lab_subparsers.add_parser("reports", parents=[common_parser], help="List detonation forensic telemetry reports")
+    p_lab_reports.add_argument("--dry-run", action="store_true", help="Simulate listing")
+    p_lab_reports.set_defaults(func=cmd_lab)
 
     p_lab.set_defaults(func=cmd_lab)
 
