@@ -1,0 +1,29 @@
+[Unit]
+Description=MAYOTIX OS Privileged IPC Management Daemon
+Documentation=https://github.com/ameyarawat/mayotix-os
+After=network.target
+Wants=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/python3 /usr/local/sbin/mayotix-daemon
+ExecReload=/bin/kill -HUP $MAINPID
+Restart=on-failure
+RestartSec=5
+RuntimeDirectory=mayotix
+RuntimeDirectoryMode=0755
+User=root
+Group=root
+
+# Hardening
+ProtectSystem=strict
+ProtectHome=read-only
+PrivateTmp=true
+NoNewPrivileges=false
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+ReadWritePaths=/run/mayotix
+
+[Install]
+WantedBy=multi-user.target
