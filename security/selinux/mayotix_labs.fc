@@ -1,0 +1,4 @@
+/usr/local/sbin/mayotix-lab.*           -- gen_context(system_u:object_r:mayotix_labs_exec_t,s0)
+/usr/share/mayotix/labs(/.*)?           gen_context(system_u:object_r:mayotix_labs_exec_t,s0)
+/var/log/mayotix/labs(/.*)?             gen_context(system_u:object_r:mayotix_labs_log_t,s0)
+/var/log/mayotix/incident(/.*)?         gen_context(system_u:object_r:mayotix_labs_log_t,s0)

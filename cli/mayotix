@@ -478,6 +478,120 @@ def cmd_monitor(args):
         sys.stderr.write(res.stderr.strip() + "\n")
     return res.returncode
 
+def cmd_lab(args):
+    """Manages ephemeral, isolated lab analysis environments."""
+    lab_script = Path(__file__).resolve().parent.parent / "desktop/labs/mayotix-lab.sh"
+    if not lab_script.exists():
+        lab_script = Path("/usr/local/sbin/mayotix-lab")
+
+    base_cmd = [str(lab_script)]
+    if sys.platform == "win32":
+        for git_bash in [
+            r"C:\Program Files\Git\bin\bash.exe",
+            r"C:\Program Files\Git\usr\bin\bash.exe",
+        ]:
+            if os.path.exists(git_bash):
+                base_cmd = [git_bash, str(lab_script)]
+                break
+    elif not os.access(str(lab_script), os.X_OK):
+        base_cmd = ["/bin/bash", str(lab_script)]
+
+    action = getattr(args, "lab_action", None) or "status"
+
+    if action == "launch":
+        cmd = list(base_cmd) + ["launch"]
+        if getattr(args, "name", None):
+            cmd.extend(["--name", args.name])
+        if getattr(args, "template", None):
+            cmd.extend(["--template", args.template])
+        if getattr(args, "network", None):
+            cmd.extend(["--network", args.network])
+        if getattr(args, "dry_run", False):
+            cmd.append("--dry-run")
+        res = subprocess.run(cmd, capture_output=True, text=True)
+        print(res.stdout.strip() or res.stderr.strip())
+        return res.returncode
+
+    elif action == "destroy":
+        cmd = list(base_cmd) + ["destroy"]
+        target = getattr(args, "lab_id", None) or "mock-lab"
+        cmd.append(target)
+        if getattr(args, "dry_run", False):
+            cmd.append("--dry-run")
+        res = subprocess.run(cmd, capture_output=True, text=True)
+        print(res.stdout.strip() or res.stderr.strip())
+        return res.returncode
+
+    elif action == "list":
+        cmd = list(base_cmd) + ["list"]
+        if getattr(args, "json", False):
+            cmd.append("--json")
+        if getattr(args, "dry_run", False):
+            cmd.append("--dry-run")
+        res = subprocess.run(cmd, capture_output=True, text=True)
+        print(res.stdout.strip() or res.stderr.strip())
+        return res.returncode
+
+    else:
+        # status
+        cmd = list(base_cmd) + ["status"]
+        if getattr(args, "json", False):
+            cmd.append("--json")
+        if getattr(args, "dry_run", False):
+            cmd.append("--dry-run")
+        res = subprocess.run(cmd, capture_output=True, text=True)
+        print(res.stdout.strip() or res.stderr.strip())
+        return res.returncode
+
+def cmd_incident(args):
+    """Executes automated incident response triage and reporting."""
+    triage_script = Path(__file__).resolve().parent.parent / "desktop/defender/incident/triage-snapshot.sh"
+    if not triage_script.exists():
+        triage_script = Path("/usr/local/sbin/mayotix-triage")
+
+    base_cmd = [str(triage_script)]
+    if sys.platform == "win32":
+        for git_bash in [
+            r"C:\Program Files\Git\bin\bash.exe",
+            r"C:\Program Files\Git\usr\bin\bash.exe",
+        ]:
+            if os.path.exists(git_bash):
+                base_cmd = [git_bash, str(triage_script)]
+                break
+    elif not os.access(str(triage_script), os.X_OK):
+        base_cmd = ["/bin/bash", str(triage_script)]
+
+    action = getattr(args, "incident_action", None) or "triage"
+
+    if action == "triage":
+        cmd = list(base_cmd)
+        if getattr(args, "output", None):
+            cmd.extend(["--output", args.output])
+        if getattr(args, "json", False):
+            cmd.append("--json")
+        if getattr(args, "dry_run", False):
+            cmd.append("--dry-run")
+        res = subprocess.run(cmd, capture_output=True, text=True)
+        print(res.stdout.strip() or res.stderr.strip())
+        return res.returncode
+
+    elif action == "report":
+        data = query_subsystem("incident.report", sock_path=args.socket)
+        if getattr(args, "json", False):
+            print(json.dumps(data, indent=2))
+        else:
+            print(f"{BOLD}{CYAN}================================================================{NC}")
+            print(f"{BOLD}{CYAN}            MAYOTIX OS Incident Triage Archives                 {NC}")
+            print(f"{BOLD}{CYAN}================================================================{NC}")
+            cnt = data.get("incident_reports_count", 0)
+            print(f"  Available Archives : {cnt}")
+            for r in data.get("reports", []):
+                print(f"    - {r.get('archive')} (SHA-256: {r.get('sha256', '')[:16]}...)")
+            print(f"{BOLD}{CYAN}================================================================{NC}")
+        return 0
+
+    return 0
+
 def cmd_version(args):
     ver = {
         "name": "MAYOTIX OS",
@@ -621,6 +735,49 @@ def main():
     p_mon.add_argument("--interval", type=int, default=0, help="Continuous polling interval in seconds")
     p_mon.add_argument("--dry-run", action="store_true", help="Simulate runtime threat monitoring")
     p_mon.set_defaults(func=cmd_monitor)
+
+    # mayotix lab
+    p_lab = subparsers.add_parser("lab", parents=[common_parser], help="Manage isolated disposable analysis sandboxes")
+    p_lab.add_argument("--dry-run", action="store_true", help="Simulate lab action")
+    lab_subparsers = p_lab.add_subparsers(dest="lab_action", help="Lab action to perform")
+
+    p_lab_launch = lab_subparsers.add_parser("launch", parents=[common_parser], help="Launch an isolated lab sandbox")
+    p_lab_launch.add_argument("-n", "--name", help="Session ID / name")
+    p_lab_launch.add_argument("-t", "--template", default="base", help="Lab template (base, malware, forensics, network)")
+    p_lab_launch.add_argument("--network", default="none", help="Network mode (none, bridge)")
+    p_lab_launch.add_argument("--dry-run", action="store_true", help="Simulate lab launch")
+    p_lab_launch.set_defaults(func=cmd_lab)
+
+    p_lab_list = lab_subparsers.add_parser("list", parents=[common_parser], help="List active lab sandboxes")
+    p_lab_list.add_argument("--dry-run", action="store_true", help="Simulate lab listing")
+    p_lab_list.set_defaults(func=cmd_lab)
+
+    p_lab_destroy = lab_subparsers.add_parser("destroy", parents=[common_parser], help="Destroy an active lab sandbox")
+    p_lab_destroy.add_argument("lab_id", nargs="?", default="mock-lab", help="Target lab session ID")
+    p_lab_destroy.add_argument("--dry-run", action="store_true", help="Simulate lab destruction")
+    p_lab_destroy.set_defaults(func=cmd_lab)
+
+    p_lab_status = lab_subparsers.add_parser("status", parents=[common_parser], help="Display lab subsystem status")
+    p_lab_status.add_argument("--dry-run", action="store_true", help="Simulate lab status")
+    p_lab_status.set_defaults(func=cmd_lab)
+
+    p_lab.set_defaults(func=cmd_lab)
+
+    # mayotix incident
+    p_inc = subparsers.add_parser("incident", parents=[common_parser], help="Automated incident response triage and reporting")
+    p_inc.add_argument("--dry-run", action="store_true", help="Simulate incident action")
+    inc_subparsers = p_inc.add_subparsers(dest="incident_action", help="Incident action to perform")
+
+    p_inc_triage = inc_subparsers.add_parser("triage", parents=[common_parser], help="Capture automated host triage snapshot")
+    p_inc_triage.add_argument("-o", "--output", help="Destination path for triage archive")
+    p_inc_triage.add_argument("--dry-run", action="store_true", help="Simulate triage capture")
+    p_inc_triage.set_defaults(func=cmd_incident)
+
+    p_inc_report = inc_subparsers.add_parser("report", parents=[common_parser], help="List collected incident triage archives")
+    p_inc_report.add_argument("--dry-run", action="store_true", help="Simulate triage reporting")
+    p_inc_report.set_defaults(func=cmd_incident)
+
+    p_inc.set_defaults(func=cmd_incident)
 
     # mayotix version
     p_ver = subparsers.add_parser("version", parents=[common_parser], help="Display version and release information")

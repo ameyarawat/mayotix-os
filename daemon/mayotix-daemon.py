@@ -417,6 +417,106 @@ def handle_monitor_scan(params):
     except Exception:
         return {"error": "Failed to parse monitor output", "raw": res.stdout.strip()}
 
+def handle_lab_launch(params):
+    lab_script = Path(__file__).resolve().parent.parent / "desktop/labs/mayotix-lab.sh"
+    if not lab_script.exists():
+        lab_script = Path("/usr/local/sbin/mayotix-lab")
+
+    allowed_templates = {"base", "malware", "forensics", "network"}
+    allowed_networks = {"none", "bridge"}
+
+    template = params.get("template", "base")
+    network = params.get("network", "none")
+
+    if template not in allowed_templates:
+        return {"success": False, "error": f"Template '{template}' not in allowed_templates"}
+    if network not in allowed_networks:
+        return {"success": False, "error": f"Network mode '{network}' not in allowed_networks"}
+
+    cmd = [str(lab_script), "launch"]
+    if params.get("name"):
+        cmd.extend(["--name", str(params["name"])])
+    cmd.extend(["--template", template, "--network", network])
+    if params.get("dry_run"):
+        cmd.append("--dry-run")
+
+    res = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
+    return {"success": res.returncode == 0, "output": res.stdout.strip() or res.stderr.strip()}
+
+def handle_lab_list(params):
+    lab_script = Path(__file__).resolve().parent.parent / "desktop/labs/mayotix-lab.sh"
+    if not lab_script.exists():
+        lab_script = Path("/usr/local/sbin/mayotix-lab")
+
+    cmd = [str(lab_script), "list", "--json"]
+    if params.get("dry_run"):
+        cmd.append("--dry-run")
+    res = subprocess.run(cmd, capture_output=True, text=True, timeout=5)
+    try:
+        return json.loads(res.stdout.strip())
+    except Exception:
+        return {"sessions": [], "raw": res.stdout.strip()}
+
+def handle_lab_destroy(params):
+    lab_script = Path(__file__).resolve().parent.parent / "desktop/labs/mayotix-lab.sh"
+    if not lab_script.exists():
+        lab_script = Path("/usr/local/sbin/mayotix-lab")
+
+    target_id = params.get("name") or params.get("id") or "mock-lab"
+    cmd = [str(lab_script), "destroy", str(target_id)]
+    if params.get("dry_run"):
+        cmd.append("--dry-run")
+    res = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
+    return {"success": res.returncode == 0, "output": res.stdout.strip() or res.stderr.strip()}
+
+def handle_lab_status(params):
+    lab_script = Path(__file__).resolve().parent.parent / "desktop/labs/mayotix-lab.sh"
+    if not lab_script.exists():
+        lab_script = Path("/usr/local/sbin/mayotix-lab")
+
+    cmd = [str(lab_script), "status", "--json"]
+    if params.get("dry_run"):
+        cmd.append("--dry-run")
+    res = subprocess.run(cmd, capture_output=True, text=True, timeout=5)
+    try:
+        return json.loads(res.stdout.strip())
+    except Exception:
+        return {"status": "UNKNOWN", "raw": res.stdout.strip()}
+
+def handle_incident_triage(params):
+    triage_script = Path(__file__).resolve().parent.parent / "desktop/defender/incident/triage-snapshot.sh"
+    if not triage_script.exists():
+        triage_script = Path("/usr/local/sbin/mayotix-triage")
+
+    cmd = [str(triage_script), "--json"]
+    if params.get("output"):
+        cmd.extend(["--output", str(params["output"])])
+    if params.get("dry_run"):
+        cmd.append("--dry-run")
+    res = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+    try:
+        return json.loads(res.stdout.strip())
+    except Exception:
+        return {"error": "Failed to parse triage output", "raw": res.stdout.strip()}
+
+def handle_incident_report(params):
+    incident_dir = Path("/var/log/mayotix/incident")
+    reports = []
+    if incident_dir.exists():
+        for archive in incident_dir.glob("triage_*.tar.gz"):
+            sha_file = Path(str(archive) + ".sha256")
+            checksum = sha_file.read_text().split()[0] if sha_file.exists() else "N/A"
+            reports.append({
+                "archive": str(archive.name),
+                "path": str(archive),
+                "size_bytes": archive.stat().st_size,
+                "sha256": checksum
+            })
+    return {
+        "incident_reports_count": len(reports),
+        "reports": reports
+    }
+
 # ==============================================================================
 # 3. JSON-RPC Protocol Dispatcher
 # ==============================================================================
@@ -436,6 +536,12 @@ RPC_METHODS = {
     "forensic.dump": lambda params: handle_forensic_dump(params),
     "forensic.sanitize": lambda params: handle_forensic_sanitize(params),
     "monitor.scan": lambda params: handle_monitor_scan(params),
+    "lab.launch": lambda params: handle_lab_launch(params),
+    "lab.list": lambda params: handle_lab_list(params),
+    "lab.destroy": lambda params: handle_lab_destroy(params),
+    "lab.status": lambda params: handle_lab_status(params),
+    "incident.triage": lambda params: handle_incident_triage(params),
+    "incident.report": lambda params: handle_incident_report(params),
     "ping": lambda params: "pong"
 }
 

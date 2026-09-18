@@ -1,0 +1,80 @@
+module mayotix_labs 1.0;
+
+require {
+    type unconfined_t;
+    type xdm_t;
+    type bin_t;
+    type lib_t;
+    type etc_t;
+    type var_t;
+    type var_log_t;
+    type tmp_t;
+    type devpts_t;
+    type proc_t;
+    type net_conf_t;
+    type node_t;
+    class file { create read write open execute execute_no_trans unlink getattr entrypoint map };
+    class dir { search open read write add_name remove_name getattr rmdir };
+    class process { transition siginh rlimitinh noatsecure signal getsched setsched setpgid fork getattr };
+    class capability { setuid setgid sys_admin sys_chroot net_admin dac_override };
+    class chr_file { read write open getattr ioctl };
+    class fifo_file { read write getattr };
+    class udp_socket { create bind setopt getattr read write };
+    class tcp_socket { create bind setopt getattr read write listen accept };
+    class netlink_route_socket { create bind read write nlmsg_read nlmsg_write };
+}
+
+# Define lab domain, execution, and log types
+type mayotix_labs_t;
+type mayotix_labs_exec_t;
+type mayotix_labs_log_t;
+
+# Process entrypoint
+allow mayotix_labs_t self:process { signal getsched setsched setpgid fork getattr };
+allow mayotix_labs_t mayotix_labs_exec_t:file { entrypoint read open execute getattr map };
+
+# Allow domain transition from unconfined user and desktop session
+type_transition unconfined_t mayotix_labs_exec_t:process mayotix_labs_t;
+allow unconfined_t mayotix_labs_t:process { transition siginh rlimitinh noatsecure };
+allow unconfined_t mayotix_labs_exec_t:file { read open execute getattr };
+
+type_transition xdm_t mayotix_labs_exec_t:process mayotix_labs_t;
+allow xdm_t mayotix_labs_t:process { transition siginh rlimitinh noatsecure };
+allow xdm_t mayotix_labs_exec_t:file { read open execute getattr };
+
+# Bounded capabilities for container/sandbox namespaces and bridge routing
+allow mayotix_labs_t self:capability { setuid setgid sys_admin sys_chroot net_admin dac_override };
+
+# Internal bridge and loopback socket networking
+allow mayotix_labs_t self:udp_socket { create bind setopt getattr read write };
+allow mayotix_labs_t self:tcp_socket { create bind setopt getattr read write listen accept };
+allow mayotix_labs_t self:netlink_route_socket { create bind read write nlmsg_read nlmsg_write };
+allow mayotix_labs_t net_conf_t:file { read open getattr };
+allow mayotix_labs_t node_t:udp_socket node_bind;
+allow mayotix_labs_t node_t:tcp_socket node_bind;
+
+# System library & interpreter execution
+allow mayotix_labs_t bin_t:file { read open execute execute_no_trans getattr map };
+allow mayotix_labs_t lib_t:file { read open execute getattr map };
+
+# System configuration reading
+allow mayotix_labs_t etc_t:file { read open getattr };
+allow mayotix_labs_t etc_t:dir { search open getattr };
+
+# Proc virtual filesystem reading
+allow mayotix_labs_t proc_t:dir { search open read getattr };
+allow mayotix_labs_t proc_t:file { read open getattr };
+
+# Confined logging: Dedicated lab & incident triage storage under /var/log/mayotix/labs & incident
+allow mayotix_labs_t var_t:dir { search open getattr };
+allow mayotix_labs_t var_log_t:dir { search open getattr };
+allow mayotix_labs_t mayotix_labs_log_t:dir { search open read write add_name remove_name getattr rmdir };
+allow mayotix_labs_t mayotix_labs_log_t:file { create read write open unlink getattr rename map };
+
+# Ephemeral tmpfs isolation (private scratch)
+allow mayotix_labs_t tmp_t:dir { create search open read write add_name remove_name getattr rmdir };
+allow mayotix_labs_t tmp_t:file { create read write open unlink getattr rename map };
+allow mayotix_labs_t devpts_t:chr_file { read write open getattr ioctl };
+
+# NOTE: Real host user home directories are EXPLICITLY OMITTED
+# to guarantee air-gap isolation and prevent accidental or malicious breakout into host user files.
