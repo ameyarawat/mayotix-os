@@ -108,6 +108,7 @@ shutdown
 kernel
 grub2-efi-x64
 shim-x64
+grub2-pc-modules
 btrfs-progs
 cryptsetup
 clevis
