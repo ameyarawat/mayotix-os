@@ -1,0 +1,75 @@
+module mayotix_defender 1.0;
+
+require {
+    type unconfined_t;
+    type xdm_t;
+    type bin_t;
+    type lib_t;
+    type etc_t;
+    type var_t;
+    type var_log_t;
+    type tmp_t;
+    type devpts_t;
+    type node_t;
+    type netif_t;
+    class unix_stream_socket { connectto create bind listen accept getattr };
+    class unix_dgram_socket { create connect sendto };
+    class sock_file { write getattr create unlink };
+    class file { create read write open execute execute_no_trans unlink link rename getattr entrypoint map };
+    class dir { search open read write add_name remove_name getattr rmdir };
+    class process { transition siginh rlimitinh noatsecure signal getsched setsched };
+    class capability { net_raw net_admin dac_override setuid setgid sys_chroot };
+    class packet_socket { create bind read write getattr ioctl getopt setopt };
+    class rawip_socket { create bind read write getattr getopt setopt };
+    class netlink_route_socket { create bind read write getattr nlmsg_read };
+    class chr_file { read write open getattr ioctl };
+}
+
+# Define defender domain and execution types
+type mayotix_defender_t;
+type mayotix_defender_exec_t;
+type mayotix_defender_log_t;
+
+# Process entrypoint
+allow mayotix_defender_t self:process { signal getsched setsched };
+allow mayotix_defender_t mayotix_defender_exec_t:file { entrypoint read open execute getattr map };
+
+# Allow domain transition from unconfined user and desktop session
+type_transition unconfined_t mayotix_defender_exec_t:process mayotix_defender_t;
+allow unconfined_t mayotix_defender_t:process { transition siginh rlimitinh noatsecure };
+allow unconfined_t mayotix_defender_exec_t:file { read open execute getattr };
+
+type_transition xdm_t mayotix_defender_exec_t:process mayotix_defender_t;
+allow xdm_t mayotix_defender_t:process { transition siginh rlimitinh noatsecure };
+allow xdm_t mayotix_defender_exec_t:file { read open execute getattr };
+
+# Network packet capture capabilities and raw packet sockets
+allow mayotix_defender_t self:capability { net_raw net_admin dac_override setuid setgid sys_chroot };
+allow mayotix_defender_t self:packet_socket { create bind read write getattr ioctl getopt setopt };
+allow mayotix_defender_t self:rawip_socket { create bind read write getattr getopt setopt };
+allow mayotix_defender_t self:netlink_route_socket { create bind read write getattr nlmsg_read };
+
+# Network interface and node access for packet inspection
+allow mayotix_defender_t netif_t:netif { ingress egress };
+allow mayotix_defender_t node_t:node { tcp_recv tcp_send udp_recv udp_send rawip_recv rawip_send };
+
+# System library & capture binary execution
+allow mayotix_defender_t bin_t:file { read open execute execute_no_trans getattr map };
+allow mayotix_defender_t lib_t:file { read open execute getattr map };
+
+# System configuration reading (resolv.conf, protocols, services)
+allow mayotix_defender_t etc_t:file { read open getattr };
+allow mayotix_defender_t etc_t:dir { search open getattr };
+
+# Confined logging: Dedicated capture storage under /var/log/mayotix/captures
+allow mayotix_defender_t var_t:dir { search open getattr };
+allow mayotix_defender_t var_log_t:dir { search open getattr };
+allow mayotix_defender_t mayotix_defender_log_t:dir { search open read write add_name remove_name getattr rmdir };
+allow mayotix_defender_t mayotix_defender_log_t:file { create read write open unlink getattr rename map };
+
+# Temporary file creation
+allow mayotix_defender_t tmp_t:dir { search open read write add_name remove_name getattr rmdir };
+allow mayotix_defender_t tmp_t:file { create read write open unlink getattr map };
+
+# Terminal output
+allow mayotix_defender_t devpts_t:chr_file { read write open getattr ioctl };

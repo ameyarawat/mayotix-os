@@ -1,0 +1,5 @@
+# MAYOTIX OS Phase 7: Defender Packet Capture SELinux File Contexts
+
+/usr/local/sbin/mayotix-capture        -- gen_context(system_u:object_r:mayotix_defender_exec_t,s0)
+/usr/share/mayotix/defender(/.*)?         gen_context(system_u:object_r:mayotix_defender_exec_t,s0)
+/var/log/mayotix/captures(/.*)?           gen_context(system_u:object_r:mayotix_defender_log_t,s0)

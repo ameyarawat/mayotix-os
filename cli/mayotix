@@ -18,6 +18,7 @@ import os
 import json
 import socket
 import argparse
+import subprocess
 from pathlib import Path
 
 DEFAULT_SOCKET_PATH = os.environ.get("MAYOTIX_SOCKET_PATH", "/run/mayotix/mayotix.sock")
@@ -269,6 +270,69 @@ def cmd_firewall(args):
     print(f"{BOLD}{CYAN}================================================================{NC}\n")
     return 0
 
+def cmd_capture(args):
+    capture_script = Path(__file__).resolve().parent.parent / "desktop/defender/mayotix-capture.sh"
+    if not capture_script.exists():
+        capture_script = Path("/usr/local/sbin/mayotix-capture")
+
+    base_cmd = [str(capture_script)]
+    if sys.platform == "win32":
+        for git_bash in [
+            r"C:\Program Files\Git\bin\bash.exe",
+            r"C:\Program Files\Git\usr\bin\bash.exe",
+        ]:
+            if os.path.exists(git_bash):
+                base_cmd = [git_bash, str(capture_script)]
+                break
+    elif not os.access(str(capture_script), os.X_OK):
+        base_cmd = ["/bin/bash", str(capture_script)]
+
+    action = getattr(args, "capture_action", None) or "status"
+
+    if action == "start":
+        cmd = list(base_cmd) + ["start"]
+        if getattr(args, "interface", None):
+            cmd.extend(["--interface", args.interface])
+        if getattr(args, "profile", None):
+            cmd.extend(["--profile", args.profile])
+        if getattr(args, "filter", None):
+            cmd.extend(["--filter", args.filter])
+        if getattr(args, "output", None):
+            cmd.extend(["--output", args.output])
+        if getattr(args, "dry_run", False):
+            cmd.append("--dry-run")
+        res = subprocess.run(cmd, capture_output=True, text=True)
+        if getattr(args, "json", False):
+            print(json.dumps({"success": res.returncode == 0, "action": "start", "output": res.stdout.strip() or res.stderr.strip()}))
+        else:
+            print(res.stdout.strip() or res.stderr.strip())
+        return res.returncode
+    elif action == "stop":
+        cmd = list(base_cmd) + ["stop"]
+        if getattr(args, "dry_run", False):
+            cmd.append("--dry-run")
+        res = subprocess.run(cmd, capture_output=True, text=True)
+        if getattr(args, "json", False):
+            print(json.dumps({"success": res.returncode == 0, "action": "stop", "output": res.stdout.strip() or res.stderr.strip()}))
+        else:
+            print(res.stdout.strip() or res.stderr.strip())
+        return res.returncode
+    elif action == "list-profiles":
+        cmd = list(base_cmd) + ["list-profiles"]
+        res = subprocess.run(cmd, capture_output=True, text=True)
+        print(res.stdout.strip() or res.stderr.strip())
+        return res.returncode
+    else:
+        # status
+        cmd = list(base_cmd) + ["status"]
+        if getattr(args, "json", False):
+            cmd.append("--json")
+        if getattr(args, "dry_run", False):
+            cmd.append("--dry-run")
+        res = subprocess.run(cmd, capture_output=True, text=True)
+        print(res.stdout.strip() or res.stderr.strip())
+        return res.returncode
+
 def cmd_version(args):
     ver = {
         "name": "MAYOTIX OS",
@@ -318,6 +382,31 @@ def main():
     p_fw.add_argument("--enable", action="store_true", help="Atomically enable fail-closed kill-switch")
     p_fw.add_argument("--disable", action="store_true", help="Disable kill-switch and restore default policy")
     p_fw.set_defaults(func=cmd_firewall)
+
+    # mayotix capture
+    p_cap = subparsers.add_parser("capture", parents=[common_parser], help="Manage defender live packet captures and security sniffing")
+    cap_subparsers = p_cap.add_subparsers(dest="capture_action", help="Capture action to perform")
+
+    p_cap_start = cap_subparsers.add_parser("start", parents=[common_parser], help="Start packet capture session")
+    p_cap_start.add_argument("-i", "--interface", help="Target network interface (e.g., wg0, eth0, any)")
+    p_cap_start.add_argument("-p", "--profile", default="wireguard-egress", help="Capture profile (wireguard-egress, dot-dns, leak-sniffer, custom)")
+    p_cap_start.add_argument("-f", "--filter", help="Custom BPF filter expression")
+    p_cap_start.add_argument("-o", "--output", help="Destination pcap file path")
+    p_cap_start.add_argument("--dry-run", action="store_true", help="Simulate capture startup without launching daemon")
+    p_cap_start.set_defaults(func=cmd_capture)
+
+    p_cap_stop = cap_subparsers.add_parser("stop", parents=[common_parser], help="Stop active packet capture session")
+    p_cap_stop.add_argument("--dry-run", action="store_true", help="Simulate capture stop")
+    p_cap_stop.set_defaults(func=cmd_capture)
+
+    p_cap_status = cap_subparsers.add_parser("status", parents=[common_parser], help="Display active packet capture status")
+    p_cap_status.add_argument("--dry-run", action="store_true", help="Simulate status check")
+    p_cap_status.set_defaults(func=cmd_capture)
+
+    p_cap_profiles = cap_subparsers.add_parser("list-profiles", parents=[common_parser], help="List available security capture profiles")
+    p_cap_profiles.set_defaults(func=cmd_capture)
+
+    p_cap.set_defaults(func=cmd_capture)
 
     # mayotix version
     p_ver = subparsers.add_parser("version", parents=[common_parser], help="Display version and release information")
