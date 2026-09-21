@@ -43,7 +43,7 @@ if [[ $EUID -ne 0 ]]; then
 fi
 
 # Install required tools
-REQUIRED_PKGS=(lorax livecd-tools anaconda pykickstart)
+REQUIRED_PKGS=(lorax livecd-tools anaconda pykickstart shim-x64 grub2-efi-x64 grub2-efi-x64-cdboot)
 MISSING_PKGS=()
 
 for pkg in "${REQUIRED_PKGS[@]}"; do
@@ -107,6 +107,7 @@ shutdown
 @hardware-support
 kernel
 grub2-efi-x64
+grub2-efi-x64-cdboot
 shim-x64
 grub2-pc-modules
 btrfs-progs
@@ -249,6 +250,35 @@ cat > /etc/motd << 'MOTD'
 
 MOTD
 
+# ---------- Ensure EFI Boot Structure for Lorax ----------
+# lorax needs EFI files at /boot/efi/EFI/ to create the ISO boot structure
+mkdir -p /boot/efi/EFI/fedora /boot/efi/EFI/BOOT
+
+# Ensure shimx64.efi is in the expected paths
+if [ ! -f /boot/efi/EFI/fedora/shimx64.efi ]; then
+    SHIM=$(find /boot /usr -name 'shimx64.efi' -type f 2>/dev/null | head -1)
+    [ -n "$SHIM" ] && cp "$SHIM" /boot/efi/EFI/fedora/shimx64.efi
+fi
+if [ ! -f /boot/efi/EFI/BOOT/BOOTX64.EFI ]; then
+    [ -f /boot/efi/EFI/fedora/shimx64.efi ] && cp /boot/efi/EFI/fedora/shimx64.efi /boot/efi/EFI/BOOT/BOOTX64.EFI
+fi
+
+# Ensure grubx64.efi is in the expected path
+if [ ! -f /boot/efi/EFI/fedora/grubx64.efi ]; then
+    GRUB=$(find /boot /usr -name 'grubx64.efi' -type f 2>/dev/null | head -1)
+    [ -n "$GRUB" ] && cp "$GRUB" /boot/efi/EFI/fedora/grubx64.efi
+fi
+
+# Ensure grub.cfg exists for EFI boot
+if [ ! -f /boot/efi/EFI/fedora/grub.cfg ]; then
+    cat > /boot/efi/EFI/fedora/grub.cfg << 'GRUBCFG'
+search --no-floppy --set=root -l 'MAYOTIX-OS-44-x86_64'
+set prefix=($root)/boot/grub2
+configfile $prefix/grub.cfg
+GRUBCFG
+fi
+
+echo "[✓] EFI boot structure verified."
 echo "[✓] MAYOTIX OS Post-Installation Complete."
 %end
 KICKSTART_EOF
