@@ -95,7 +95,7 @@ user --name=mayotix --groups=wheel --plaintext --password=mayotix --gecos="MAYOT
 # Partitioning — simple layout for live image build filesystem
 zerombr
 clearpart --all
-part / --fstype=ext4 --size=8192
+part / --fstype=ext4 --size=12288
 
 # Shutdown after build (required by livemedia-creator)
 shutdown
@@ -133,17 +133,18 @@ iproute
 # Python (for daemon & tools)
 python3
 python3-pip
+python3-gobject
+python3-pyqt6
 
-# Desktop Environment
+# Desktop Environment (GNOME)
 @base-x
-sway
-foot
-waybar
-wofi
-mako
-grim
-slurp
-wl-clipboard
+@gnome-desktop
+gdm
+gnome-terminal
+nautilus
+firefox
+gnome-control-center
+gnome-tweaks
 xdg-utils
 desktop-file-utils
 
@@ -225,7 +226,43 @@ chmod +x /usr/local/sbin/mayotix-installer.sh /usr/local/sbin/partition-validato
 # ---------- SELinux Policies ----------
 cp "$MAYOTIX_SRC/security/selinux/"*.te "$MAYOTIX_SRC/security/selinux/"*.fc /usr/share/selinux/packages/ 2>/dev/null || true
 
-# ---------- Enable Services ----------
+# ---------- Configure GDM Autologin for Live Session ----------
+mkdir -p /etc/gdm
+cat > /etc/gdm/custom.conf << 'GDM_EOF'
+[daemon]
+AutomaticLoginEnable=True
+AutomaticLogin=mayotix
+WaylandEnable=true
+
+[security]
+
+[xdmcp]
+
+[chooser]
+
+[debug]
+GDM_EOF
+
+# ---------- Configure GNOME Defaults & Dark Theme ----------
+mkdir -p /etc/dconf/db/local.d
+cat > /etc/dconf/db/local.d/01-mayotix-defaults << 'DCONF_EOF'
+[org/gnome/shell]
+favorite-apps=['firefox.desktop', 'org.gnome.Terminal.desktop', 'org.gnome.Nautilus.desktop', 'mayotix-pentest.desktop', 'mayotix-defender.desktop', 'mayotix-installer.desktop']
+
+[org/gnome/desktop/interface]
+color-scheme='prefer-dark'
+clock-show-weekday=true
+show-battery-percentage=true
+
+[org/gnome/desktop/wm/preferences]
+button-layout='appmenu:minimize,maximize,close'
+DCONF_EOF
+
+dconf update || true
+
+# ---------- Enable Services & Graphical Boot ----------
+systemctl set-default graphical.target
+systemctl enable gdm.service
 systemctl enable auditd.service
 systemctl enable nftables.service
 systemctl enable systemd-resolved.service
