@@ -43,7 +43,7 @@ if [[ $EUID -ne 0 ]]; then
 fi
 
 # Install required tools
-REQUIRED_PKGS=(lorax livecd-tools anaconda pykickstart shim-x64 grub2-efi-x64 grub2-efi-x64-cdboot)
+REQUIRED_PKGS=(lorax livecd-tools anaconda pykickstart shim-x64 grub2-efi-x64 grub2-efi-x64-cdboot isomd5sum)
 MISSING_PKGS=()
 
 for pkg in "${REQUIRED_PKGS[@]}"; do
@@ -225,9 +225,6 @@ chmod +x /usr/local/sbin/mayotix-installer.sh /usr/local/sbin/partition-validato
 # ---------- SELinux Policies ----------
 cp "$MAYOTIX_SRC/security/selinux/"*.te "$MAYOTIX_SRC/security/selinux/"*.fc /usr/share/selinux/packages/ 2>/dev/null || true
 
-# ---------- Enable SELinux Relabeling ----------
-touch /.autorelabel
-
 # ---------- Enable Services ----------
 systemctl enable auditd.service
 systemctl enable nftables.service
@@ -315,6 +312,11 @@ livemedia-creator \
     --iso-name="$ISO_NAME" \
     --tmp="$LORAX_TMPDIR" \
     --logfile="/var/tmp/mayotix-iso-build.log"
+
+if command -v implantisomd5 &>/dev/null && [[ -f "${ISO_OUTPUT_DIR}/${ISO_NAME}" ]]; then
+    echo -e "${BLUE}[INFO]${NC} Embedding checksum into ISO with implantisomd5..."
+    implantisomd5 "${ISO_OUTPUT_DIR}/${ISO_NAME}" || true
+fi
 
 # --------------------------------------------------------------------------
 # Step 4: Done
